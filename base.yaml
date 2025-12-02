@@ -1,0 +1,26 @@
+data:
+  train_ann: data/processed/msvd/train/annotations.json
+  val_ann: data/processed/msvd/val/annotations.json
+  test_ann: data/processed/msvd/test/annotations.json
+  num_frames: 8
+  image_size: 224
+  max_len: 32
+  batch_size: 2
+  num_workers: 2
+
+model:
+  video_encoder: vit_base_patch16_224    # 可换成 timeSformer
+  text_decoder: gpt2                     # GPT-2 小模型
+  hidden_size: 768
+
+train:
+  optimizer: adamw
+  learning_rate: 5e-5
+  weight_decay: 0.01
+  max_steps: 200        # 小步先试跑
+  log_interval: 10
+  save_dir: checkpoints/msvd_debug
+
+eval:
+  metrics: [bleu, cider]  # 后面可以加 spice, clipscore
+  eval_interval: 50

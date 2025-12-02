@@ -1,0 +1,28 @@
+# Ignore model checkpoints
+# --- 系统与编辑器配置 ---
+.vscode/
+.chainlit/
+.DS_Store
+
+# --- Python 编译缓存 (必须忽略) ---
+__pycache__/
+*.py[cod]
+
+# --- 模型权重与大文件 (核心瘦身项) ---
+checkpoints/
+*.pth
+*.bin
+*.ckpt
+*.safetensors
+*.onnx
+
+# --- 数据集与素材 ---
+data/
+Image/
+
+# --- 运行日志与生成结果 ---
+logs/
+eval_results/
+figs/
+outputs/
+runs/
