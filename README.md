@@ -1,11 +1,12 @@
-![alt text](image-1.png)
+<img width="1455" height="615" alt="image" src="https://github.com/user-attachments/assets/5ddd24c6-db58-4add-b357-78e370278619" />
+
 
 # Video Captioning System Based on ViT and GPT-2
 
 This repository contains the implementation code for the paper: **"Design and Implementation of a Multi-Modal Video Captioning System Based on ViT and GPT-2"**.
 
 ## 📂 Project Structure
-(这里简单解释一下你那些乱七八糟的文件夹是干嘛的，显得很有条理)
+
 - `src/`: Core implementation of the video captioning model.
 - `scripts/`: Experimental scripts for data preprocessing and testing.
 - `Ui/`: Front-end interface code (Chainlit/React).
@@ -44,7 +45,8 @@ The project provides:
 ---
 #### 📈 Model Architecture
 
-![alt text](image-2.png)
+<img width="972" height="540" alt="image" src="https://github.com/user-attachments/assets/050bca5d-2dd7-45d8-9878-990cfc1da56a" />
+
 
 
 ---
