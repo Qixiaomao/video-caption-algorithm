@@ -1,6 +1,23 @@
 ![alt text](image-1.png)
 
-# Video Captioning System with ViT + GPT-2 and Chainlit Front-end
+# Video Captioning System Based on ViT and GPT-2
+
+This repository contains the implementation code for the paper: **"Design and Implementation of a Multi-Modal Video Captioning System Based on ViT and GPT-2"**.
+
+## 📂 Project Structure
+(这里简单解释一下你那些乱七八糟的文件夹是干嘛的，显得很有条理)
+- `src/`: Core implementation of the video captioning model.
+- `scripts/`: Experimental scripts for data preprocessing and testing.
+- `Ui/`: Front-end interface code (Chainlit/React).
+- `tools/`: Utility scripts for video frame extraction.
+
+## ⚠️ Note on Pre-trained Models and Datasets
+Due to GitHub's file size limits, the **pre-trained model weights (checkpoints)** and **large video datasets** are NOT included in this repository.
+- **Checkpoints:** The system relies on ViT and GPT-2 weights.
+- **Data:** The training data (e.g., MSVD/MSR-VTT) is excluded.
+
+
+## Video Captioning System with ViT + GPT-2 and Chainlit Front-end
 
 This repository contains the full implementation of my Master's graduation project:  
 **An end-to-end Video Captioning System integrating a ViT-based video encoder, GPT-2 text decoder, and a Chainlit-powered front-end for interactive inference.**
@@ -32,42 +49,6 @@ The project provides:
 
 ---
 
-####  📂 Project Structure
-
-```c:
-project_root/
-│
-├── data/
-│ ├── raw/
-│ └── processed/
-│ └── msvd/
-│ ├── train.json
-│ ├── val.json
-│ ├── test.json
-│ └── frames/
-│
-├── src/
-│ ├── models/
-│ ├── dataloaders/
-│ ├── cli/
-│ │ ├── train.py
-│ │ └── inference.py
-│ └── utils/
-│
-├── scripts/
-│ ├── msvd_prepare.py
-│ └── generate_human_eval.py
-│
-├── Ui/
-│ └── app_chainlit.py
-│
-├── outputs/
-│ └── checkpoints/
-│
-├── requirements.txt
-└── README.md
-
-```
 
 
 
@@ -143,9 +124,15 @@ Generate captions interactively
 - Deploy model via FastAPI backend
 
 ---
-### How to start
+### How to run
 
-1. Clone the repository:
+1. **Install Dependencies:**
+
+```bash:
+   pip install -r requirements.txt
+```
+
+2. **Clone the repository:**
 ```c:
 1. git clone
 
