@@ -1,4 +1,4 @@
-# src/models/text_decoder.py
+﻿# src/models/text_decoder.py
 # -*- coding: utf-8 -*-
 from typing import Optional, List
 import torch
@@ -6,9 +6,12 @@ import torch.nn as nn
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
 class GPT2TextDecoder(nn.Module):
+    # INFO(core-ops): language-side hot operators live here:
+    # mapper projection, token embedding lookup, and HF generation.
+    # TODO(decouple): hide HF-specific implementation behind a narrower adapter.
     """
-    将视频向量映射到 GPT-2 的条件输入并生成文本。
-    不要在本文件 import caption_model，避免循环依赖。
+    灏嗚棰戝悜閲忔槧灏勫埌 GPT-2 鐨勬潯浠惰緭鍏ュ苟鐢熸垚鏂囨湰銆?
+    涓嶈鍦ㄦ湰鏂囦欢 import caption_model锛岄伩鍏嶅惊鐜緷璧栥€?
     """
     def __init__(self,
                  gpt2_name: str = "gpt2",
@@ -40,8 +43,9 @@ class GPT2TextDecoder(nn.Module):
         else:
             raise ValueError("cond_mode must be 'prefix' or 'bos'")
 
-    # ---- 内部工具：根据 cond_mode 组装 inputs_embeds ----
+    # ---- 鍐呴儴宸ュ叿锛氭牴鎹?cond_mode 缁勮 inputs_embeds ----
     def _build_inputs(self, video_emb: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+        # INFO(core-ops): visual-text fusion happens here before GPT-2 decode.
         B = video_emb.size(0)
         hid = self.model.config.n_embd
         base_embeds = self.model.transformer.wte(input_ids)      # [B,L,H]
@@ -66,7 +70,7 @@ class GPT2TextDecoder(nn.Module):
         if attention_mask is None:
             attention_mask = (input_ids != self.tokenizer.pad_token_id).long()
 
-        # 为 prefix/bos 补 mask
+        # 涓?prefix/bos 琛?mask
         extra = self.prefix_len if self.cond_mode == "prefix" else 1
         extra_mask = torch.ones(B, extra, dtype=attention_mask.dtype, device=attention_mask.device)
         attn = torch.cat([extra_mask, attention_mask], dim=1)
@@ -95,6 +99,8 @@ class GPT2TextDecoder(nn.Module):
                  no_repeat_ngram_size: int = 3,
                  repetition_penalty: float = 1.15,
                  min_new_tokens: int = 8) -> List[str]:
+        # TODO(decouple): move generation policy into a shared config object
+        # for API, tests, and benchmark suites.
         device = video_emb.device
         if prompt:
             input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(device)
@@ -102,9 +108,15 @@ class GPT2TextDecoder(nn.Module):
             input_ids = torch.tensor([[self.tokenizer.bos_token_id]], device=device)
 
         inputs_embeds = self._build_inputs(video_emb, input_ids)
+        attention_mask = torch.ones(
+            inputs_embeds.shape[:2],
+            dtype=torch.long,
+            device=inputs_embeds.device,
+        )
 
         out_ids = self.model.generate(
             inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
             max_new_tokens=max_new_tokens,
             min_new_tokens=min_new_tokens,
             num_beams=num_beams,
@@ -118,3 +130,4 @@ class GPT2TextDecoder(nn.Module):
         )
         texts = self.tokenizer.batch_decode(out_ids, skip_special_tokens=True)
         return [t.strip() for t in texts]
+

@@ -5,7 +5,7 @@
 This repository contains the implementation code for the paper: **"Design and Implementation of a Multi-Modal Video Captioning System Based on ViT and GPT-2"**.
 
 ## 📂 Project Structure
-(这里简单解释一下你那些乱七八糟的文件夹是干嘛的，显得很有条理)
+(这里简单解释一下你那些乱七八糟的文件夹是干嘛的，显得很有条�?
 - `src/`: Core implementation of the video captioning model.
 - `scripts/`: Experimental scripts for data preprocessing and testing.
 - `Ui/`: Front-end interface code (Chainlit/React).
@@ -95,7 +95,8 @@ Example summary results:
 
 To launch the interactive UI:
 ```c:
-chainlit run Ui/app_chainlit.py -w
+uvicorn server.app:app --host 127.0.0.1 --port 8001 --reload
+chainlit run frontend/chainlit_app.py -w --host 127.0.0.1 --port 8000
 ```
 
 
@@ -126,18 +127,113 @@ Generate captions interactively
 ---
 ### How to run
 
-1. **Install Dependencies:**
+This project now uses a dedicated Python 3.11 virtual environment under `.venv`.
+Use the project scripts below instead of mixing system Python interpreters.
 
-```bash:
-   pip install -r requirements.txt
+1. **Install dependencies into the project venv:**
+
+```bash
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-2. **Clone the repository:**
-```c:
-1. git clone
+2. **Check the project environment:**
 
-2. cd video-captioning-project
-
-3. chainlit run chainlit_app.py -w
-
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check_project_env.ps1
 ```
+
+3. **Start backend + frontend together:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start_app_stack.ps1
+```
+
+4. **Run the optimization baseline benchmark:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_profiling.ps1 -Mode benchmark
+```
+
+By default this runs in offline Hugging Face mode for local-model benchmarking, so cached GPT-2 / timm weights are used without remote checks. Add `-AllowOnlineModelChecks` only when you intentionally want online refresh behavior.
+
+This exports:
+
+```text
+reports\baseline_iterations.csv
+reports\baseline_summary.json
+```
+
+5. **Run the single Nsight profile entrypoint:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_profiling.ps1 -Mode profile
+```
+
+This exports:
+
+```text
+reports\profile_once.json
+```
+
+
+6. **Run Nsight Systems on the single profile entrypoint:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_nsys.ps1
+```
+
+This also defaults to offline model loading for cleaner local traces. Add `-AllowOnlineModelChecks` if you want to permit remote model checks.
+
+The default mode now captures the whole single-run process so a report is generated more reliably. Add `-UseNvtxCaptureRange` only if you specifically want capture to start from the `Inference_Once` NVTX range.
+This exports:
+
+```text
+reports\profile_once.nsys-rep
+reports\profile_once.json
+```
+
+If your Nsight Systems executable is in a different location, override it:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_nsys.ps1 -NsightSystemsExe "D:\programs\NsightSystems\target-windows-x64\nsys.exe"
+```
+
+7. **Run Nsight Compute on a selected hotspot:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target GPT2_Decoder_Step
+```
+
+This also defaults to offline model loading for local benchmarking.
+
+Or target the encoder:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target ViT_Encoder
+```
+
+This exports one of:
+
+```text
+reports\ncu_gpt2_decoder.ncu-rep
+reports\ncu_gpt2_decoder_meta.json
+reports\ncu_vit_encoder.ncu-rep
+reports\ncu_vit_encoder_meta.json
+```
+
+If your Nsight Compute launcher is in a different location, override it:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target GPT2_Decoder_Step -NsightComputeBat "D:\programs\Nsight Computer\ncu.bat"
+```
+
+8. **Manual fallback commands** (only if you need them):
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8001 --reload
+.\.venv\Scripts\python.exe -m chainlit run frontend/chainlit_app.py -w --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe core\scripts\benchmark_baseline.py --frames-dir "data\processed\msvd\val\frames\0lh_UWF9ZP4_21_26" --device cuda
+.\.venv\Scripts\python.exe core\scripts\profile_nsight.py --frames-dir "data\processed\msvd\val\frames\0lh_UWF9ZP4_21_26" --device cuda
+```
+
+

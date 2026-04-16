@@ -1,0 +1,233 @@
+﻿from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import torch
+
+import backend_config
+from core.config import InferenceConfig
+from core.env import assert_core_runtime_ready
+from core.models.model_loader import load_caption_model
+from core.preprocessing.frame_loader import load_video_tensor
+
+MB = 1024.0 * 1024.0
+
+
+class NvtxRange:
+    def __init__(self, name: str):
+        self.name = name
+
+    def __enter__(self):
+        torch.cuda.nvtx.range_push(self.name)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        torch.cuda.nvtx.range_pop()
+        return False
+
+
+@torch.inference_mode()
+def run_one_profile(model, config: InferenceConfig, frames_dir: str, prompt: str, max_new_tokens: int):
+    with NvtxRange("Inference_Once"):
+        with NvtxRange("Preprocessing"):
+            video = load_video_tensor(
+                frames_dir,
+                num_frames=config.num_frames,
+                image_size=config.image_size,
+                device=config.device,
+            )
+
+        with NvtxRange("ViT_Encoder"):
+            encoder_out = model.encoder(video)
+
+        with NvtxRange("Cross_Modal_Alignment"):
+            emb = model.proj(encoder_out)
+            if emb.dim() == 2:
+                emb = emb.unsqueeze(1)
+            if config.ln_scale is not None and config.ln_scale > 0:
+                emb = torch.nn.functional.layer_norm(emb, emb.shape[-1:]) * config.ln_scale
+            if config.in_weight is not None and config.in_weight > 0:
+                emb = emb * config.in_weight
+
+            if model.decoder.cond_mode == "prefix":
+                hidden = model.decoder.model.config.n_embd
+                prefix_embeds = model.decoder.mapper(emb).view(emb.size(0), model.decoder.prefix_len, hidden)
+            else:
+                prefix_embeds = model.decoder.mapper(emb)
+                if prefix_embeds.dim() == 2:
+                    prefix_embeds = prefix_embeds.unsqueeze(1)
+
+        decoder = model.decoder
+        tokenizer = decoder.tokenizer
+        gpt2 = decoder.model
+        device = prefix_embeds.device
+
+        if prompt:
+            prompt_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+        else:
+            bos_token_id = tokenizer.bos_token_id
+            if bos_token_id is None:
+                bos_token_id = tokenizer.eos_token_id
+            prompt_ids = torch.tensor([[bos_token_id]], dtype=torch.long, device=device)
+
+        prompt_embeds = gpt2.transformer.wte(prompt_ids)
+        next_input_embeds = torch.cat([prefix_embeds, prompt_embeds], dim=1)
+        running_attention_mask = torch.ones(next_input_embeds.shape[:2], dtype=torch.long, device=device)
+        past_key_values = None
+        generated_tokens: list[int] = []
+
+        with NvtxRange("GPT2_Decoder_Step"):
+            for step_idx in range(max_new_tokens):
+                with NvtxRange(f"GPT2_Decoder_Step/token_{step_idx:02d}"):
+                    outputs = gpt2(
+                        inputs_embeds=next_input_embeds,
+                        attention_mask=running_attention_mask,
+                        past_key_values=past_key_values,
+                        use_cache=True,
+                        return_dict=True,
+                    )
+
+                logits = outputs.logits[:, -1, :]
+                next_token = torch.argmax(logits, dim=-1)
+                token_id = int(next_token.item())
+                generated_tokens.append(token_id)
+                past_key_values = outputs.past_key_values
+
+                if token_id == tokenizer.eos_token_id:
+                    break
+
+                next_input_embeds = gpt2.transformer.wte(next_token).unsqueeze(1)
+                running_attention_mask = torch.cat(
+                    [
+                        running_attention_mask,
+                        torch.ones((next_input_embeds.shape[0], 1), dtype=torch.long, device=device),
+                    ],
+                    dim=1,
+                )
+
+    text = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
+    return {"caption": text, "generated_tokens": len(generated_tokens)}
+
+
+def get_env(device: torch.device) -> dict[str, object]:
+    props = torch.cuda.get_device_properties(device)
+    return {
+        "torch": torch.__version__,
+        "torch_cuda": torch.version.cuda,
+        "device": torch.cuda.get_device_name(device),
+        "compute_capability": f"{props.major}.{props.minor}",
+        "total_vram_mb": props.total_memory / MB,
+    }
+
+
+def build_config(args: argparse.Namespace) -> InferenceConfig:
+    return InferenceConfig(
+        ckpt=args.ckpt,
+        vit_name=args.vit_name,
+        gpt2_name=args.gpt2_name,
+        prefix_len=args.prefix_len,
+        num_frames=args.num_frames,
+        image_size=args.image_size,
+        ln_scale=args.ln_scale,
+        in_weight=args.in_weight,
+        device=args.device,
+        backend="torch",
+    )
+
+
+def parse_args():
+    parser = argparse.ArgumentParser("Single-run deterministic Nsight Systems profile entrypoint")
+    parser.add_argument("--frames-dir", required=True, help="Directory that contains frame_*.jpg")
+    parser.add_argument("--ckpt", default=str(backend_config.CKPT_PATH), help="Path to caption model checkpoint")
+    parser.add_argument("--device", default="cuda", help="CUDA device, e.g. cuda or cuda:0")
+    parser.add_argument("--vit-name", default=backend_config.VIT_NAME)
+    parser.add_argument("--gpt2-name", default=backend_config.GPT2_NAME)
+    parser.add_argument("--prefix-len", type=int, default=backend_config.PREFIX_LEN)
+    parser.add_argument("--num-frames", type=int, default=backend_config.NUM_FRAMES)
+    parser.add_argument("--image-size", type=int, default=backend_config.IMAGE_SIZE)
+    parser.add_argument("--ln-scale", type=float, default=backend_config.LN_SCALE)
+    parser.add_argument("--in-weight", type=float, default=backend_config.IN_WEIGHT)
+    parser.add_argument("--prompt", default=backend_config.PROMPT3)
+    parser.add_argument("--max-new-tokens", type=int, default=24)
+    parser.add_argument("--warmup", type=int, default=3)
+    parser.add_argument("--export-json", default="", help="Optional JSON output path for single-run metadata")
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is required for Nsight profiling.")
+
+    assert_core_runtime_ready(device=args.device, require_cupy=False)
+    config = build_config(args)
+    model = load_caption_model(config)
+    device = torch.device(args.device)
+    env = get_env(device)
+
+    print("=== Nsight Profile Environment ===")
+    print(f"torch: {env['torch']}")
+    print(f"torch.version.cuda: {env['torch_cuda']}")
+    print(f"device: {env['device']}")
+    print(f"frames_dir: {args.frames_dir}")
+    print(f"ckpt: {args.ckpt}")
+    if args.export_json:
+        print(f"export_json: {args.export_json}")
+    print()
+
+    for _ in range(args.warmup):
+        _ = run_one_profile(model, config, args.frames_dir, args.prompt, args.max_new_tokens)
+        torch.cuda.synchronize(device)
+
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats(device)
+    result = run_one_profile(model, config, args.frames_dir, args.prompt, args.max_new_tokens)
+    torch.cuda.synchronize(device)
+    peak_memory_mb = torch.cuda.max_memory_allocated(device) / MB
+
+    print(f"caption: {result['caption']!r}")
+    print(f"generated_tokens: {result['generated_tokens']}")
+    print(f"peak_memory_mb: {peak_memory_mb:.1f}")
+
+    if args.export_json:
+        output_path = Path(args.export_json)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as fh:
+            json.dump(
+                {
+                    "env": env,
+                    "config": {
+                        "frames_dir": args.frames_dir,
+                        "ckpt": args.ckpt,
+                        "device": args.device,
+                        "prompt": args.prompt,
+                        "warmup": args.warmup,
+                        "max_new_tokens": args.max_new_tokens,
+                        "num_frames": args.num_frames,
+                        "image_size": args.image_size,
+                        "prefix_len": args.prefix_len,
+                        "ln_scale": args.ln_scale,
+                        "in_weight": args.in_weight,
+                    },
+                    "result": {
+                        "caption": result["caption"],
+                        "generated_tokens": result["generated_tokens"],
+                        "peak_memory_mb": peak_memory_mb,
+                    },
+                },
+                fh,
+                ensure_ascii=False,
+                indent=2,
+            )
+        print(f"profile JSON exported to: {args.export_json}")
+
+
+if __name__ == "__main__":
+    main()

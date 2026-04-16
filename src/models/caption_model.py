@@ -9,6 +9,9 @@ from src.models.video_encoder import build_vit_encoder
 from src.models.text_decoder import GPT2TextDecoder
 
 class VideoCaptionModel(nn.Module):
+    # INFO(core-model): this is the in-house captioning model loaded by the
+    # resident inference path in the current startup flow.
+    # TODO(decouple): expose this through a stable runtime/service interface.
     """
     视频帧 -> ViT 编码 -> (可选 MLP) -> GPT-2 条件生成
     只依赖 text_decoder，不要形成反向 import。
@@ -47,6 +50,11 @@ class VideoCaptionModel(nn.Module):
             prefix_len=prefix_len,
             video_dim=video_dim,
         )
+        # INFO(core-ops):
+        # - encoder: vision feature extraction hot path
+        # - proj: visual adaptation/projection point
+        # - decoder.mapper: visual-to-language bridge
+        # - decoder.model: GPT-2 decode hot path
 
     def forward(self,
                 video: torch.Tensor,                # [B,T,3,224,224]
@@ -63,6 +71,7 @@ class VideoCaptionModel(nn.Module):
                  video: torch.Tensor,
                  prompt: str = "",
                  **gen_kwargs):
+        # INFO(core-ops): most relevant runtime path for latency profiling.
         video_emb = self.encoder(video)
         video_emb = self.proj(video_emb)
         return self.decoder.generate(video_emb, prompt=prompt, **gen_kwargs)

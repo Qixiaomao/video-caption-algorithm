@@ -42,6 +42,10 @@ class ViTConfig:
 
 
 class ViTFrameEncoder(nn.Module):
+    # INFO(core-ops): vision-side hot operators live here:
+    # timm/torchvision ViT forward, spatial pooling, temporal mean, and projection.
+    # TODO(decouple): make backbone selection and pooling strategy injectable
+    # so profiling and replacement do not require touching product entry code.
     """
     ViT video frame encoder:
       forward(x): x ∈ [B,T,3,H,W] or [B,3,H,W] -> [B, D]

@@ -26,3 +26,16 @@ eval_results/
 figs/
 outputs/
 runs/
+# --- Local environment and secrets ---
+.env
+.venv/
+
+# --- Local profiling / experiment outputs ---
+reports/
+
+# --- Project-local notes / drafts / skills (not for this code push) ---
+docs/
+prompts/
+chainlit.md
+requirements.full-freeze.txt
+public_posts/
