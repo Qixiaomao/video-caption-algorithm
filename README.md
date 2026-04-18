@@ -1,210 +1,135 @@
-![alt text](image-1.png)
+# Video Captioning Transformer
 
-# Video Captioning System Based on ViT and GPT-2
+This repository contains the implementation for a master's graduation project on video captioning with a ViT-based visual encoder and a GPT-2 text decoder. The project also includes local benchmarking and profiling entrypoints, plus a Chainlit + FastAPI demo stack for interactive inference.
 
-This repository contains the implementation code for the paper: **"Design and Implementation of a Multi-Modal Video Captioning System Based on ViT and GPT-2"**.
+## Overview
 
-## 📂 Project Structure
-(这里简单解释一下你那些乱七八糟的文件夹是干嘛的，显得很有条�?
-- `src/`: Core implementation of the video captioning model.
-- `scripts/`: Experimental scripts for data preprocessing and testing.
-- `Ui/`: Front-end interface code (Chainlit/React).
-- `tools/`: Utility scripts for video frame extraction.
+The system covers the full workflow for video captioning:
+- video frame preprocessing
+- multimodal caption generation
+- training and evaluation scripts
+- interactive local inference UI
+- Nsight Systems / Nsight Compute profiling workflows
 
-## ⚠️ Note on Pre-trained Models and Datasets
-Due to GitHub's file size limits, the **pre-trained model weights (checkpoints)** and **large video datasets** are NOT included in this repository.
-- **Checkpoints:** The system relies on ViT and GPT-2 weights.
-- **Data:** The training data (e.g., MSVD/MSR-VTT) is excluded.
+## Repository Layout
 
+- `core/`: runtime, profiling, benchmarking, and shared inference logic
+- `src/`: model and training code
+- `server/`: FastAPI backend used by the demo stack
+- `frontend/`: Chainlit interface for interactive caption generation
+- `scripts/`: PowerShell and Python utility scripts for setup, preprocessing, and experiments
+- `docs/`: development notes, public writeups, and profiling records
+- `reports/`: generated benchmark and profiler outputs
+- `data/`: local datasets and processed frame directories
+- `checkpoints/`, `outputs/`, `runs/`: model artifacts and experiment outputs
 
-## Video Captioning System with ViT + GPT-2 and Chainlit Front-end
+## Models and Data
 
-This repository contains the full implementation of my Master's graduation project:  
-**An end-to-end Video Captioning System integrating a ViT-based video encoder, GPT-2 text decoder, and a Chainlit-powered front-end for interactive inference.**
+Large assets are intentionally not committed to GitHub.
+- Model checkpoints are expected to be stored locally.
+- Datasets such as MSVD or MSR-VTT should be prepared under the local `data/` directory.
+- Some workflows default to offline model loading so local benchmarking stays reproducible.
 
-The project provides:
-- A complete video captioning model  
-- Data preprocessing pipeline  
-- Training and evaluation scripts  
-- A user-friendly Chainlit demo interface  
-- Human evaluation results for caption quality  
+## Features
 
----
+- Vision Transformer based visual encoding
+- GPT-2 based caption decoding
+- frame-based video preprocessing pipeline
+- CLI and UI inference paths
+- local benchmarking for latency and throughput
+- Nsight Systems and Nsight Compute profiling entrypoints
+- FastAPI + Chainlit demo integration
 
-## 🚀 Features
+## Environment Setup
 
-- **Vision Transformer (ViT) Encoder**
-- **GPT-2 Language Decoder**
-- **CLIP-style Multimodal Projection Head**
-- **Frame-based Video Preprocessing**
-- **Chainlit UI for Real-time Caption Generation**
-- **Human Evaluation using Fluency / Relevance / Specificity / Overall Preference**
-- **Support for MSVD Dataset**
+This project uses a dedicated Python 3.11 virtual environment under `.venv`.
 
----
-#### 📈 Model Architecture
+Install dependencies:
 
-![alt text](image-2.png)
-
-
----
-
-
-
-
----
-
-🤖 Inference (CLI)
-
-Example:
-
-```c:
-python src/cli/inference.py \
-    --video_path example.mp4 \
-    --checkpoint outputs/checkpoints/best.ckpt \
-    --num_frames 16
-
-```
-
-
-Outputs:
-
-```css:
-Generated caption: "A woman is preparing food in the kitchen."
-```
-
----
-
-📊 Human Evaluation
-
-A human evaluation survey was conducted using 4 criteria:
-
-**Fluency,Relevance,Specificity,Overall Preference**
-
-Example summary results:
-
-| Criterion          | Avg. Score |
-| ------------------ | ---------- |
-| Fluency            | 3.38       |
-| Relevance          | 2.63       |
-| Specificity        | 3.25       |
-| Overall Preference | 4.00       |
-
----
-💬 Chainlit Demo (Front-end)
-
-To launch the interactive UI:
-```c:
-uvicorn server.app:app --host 127.0.0.1 --port 8001 --reload
-chainlit run frontend/chainlit_app.py -w --host 127.0.0.1 --port 8000
-```
-
-
-Then open the local URL shown in the terminal.
-
-In the UI, you can:
-
-Select an inference engine
-
-Paste a video frame directory path
-
-Generate captions interactively
-
-
----
-🔍 TODO
-
-- Add support for audio-based captioning
-
-- Extend dataset to MSR-VTT
-
-- Improve Chainlit UI for video uploading
-
-- Add BLEU/ROUGE automatic metrics to the demo
-
-- Deploy model via FastAPI backend
-
----
-### How to run
-
-This project now uses a dedicated Python 3.11 virtual environment under `.venv`.
-Use the project scripts below instead of mixing system Python interpreters.
-
-1. **Install dependencies into the project venv:**
-
-```bash
+```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-2. **Check the project environment:**
+Check the local project environment:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\check_project_env.ps1
 ```
 
-3. **Start backend + frontend together:**
+## Run the App Stack
+
+Start backend and frontend together:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start_app_stack.ps1
 ```
 
-4. **Run the optimization baseline benchmark:**
+Manual fallback commands:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8001 --reload
+.\.venv\Scripts\python.exe -m chainlit run frontend/chainlit_app.py -w --host 127.0.0.1 --port 8000
+```
+
+## CLI Inference
+
+Example:
+
+```powershell
+python src/cli/inference.py --video_path example.mp4 --checkpoint outputs/checkpoints/best.ckpt --num_frames 16
+```
+
+## Benchmarking and Profiling
+
+Run the optimization baseline benchmark:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_profiling.ps1 -Mode benchmark
 ```
 
-By default this runs in offline Hugging Face mode for local-model benchmarking, so cached GPT-2 / timm weights are used without remote checks. Add `-AllowOnlineModelChecks` only when you intentionally want online refresh behavior.
-
-This exports:
+Default outputs:
 
 ```text
 reports\baseline_iterations.csv
 reports\baseline_summary.json
 ```
 
-5. **Run the single Nsight profile entrypoint:**
+Run the single profiling entrypoint:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_profiling.ps1 -Mode profile
 ```
 
-This exports:
+Default output:
 
 ```text
 reports\profile_once.json
 ```
 
-
-6. **Run Nsight Systems on the single profile entrypoint:**
+Run Nsight Systems:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_nsys.ps1
 ```
 
-This also defaults to offline model loading for cleaner local traces. Add `-AllowOnlineModelChecks` if you want to permit remote model checks.
-
-The default mode now captures the whole single-run process so a report is generated more reliably. Add `-UseNvtxCaptureRange` only if you specifically want capture to start from the `Inference_Once` NVTX range.
-This exports:
+Default outputs:
 
 ```text
 reports\profile_once.nsys-rep
 reports\profile_once.json
 ```
 
-If your Nsight Systems executable is in a different location, override it:
+If needed, override the `nsys.exe` path:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_nsys.ps1 -NsightSystemsExe "D:\programs\NsightSystems\target-windows-x64\nsys.exe"
 ```
 
-7. **Run Nsight Compute on a selected hotspot:**
+Run Nsight Compute for the GPT-2 decoder hotspot:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target GPT2_Decoder_Step
 ```
-
-This also defaults to offline model loading for local benchmarking.
 
 Or target the encoder:
 
@@ -212,7 +137,7 @@ Or target the encoder:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target ViT_Encoder
 ```
 
-This exports one of:
+Example outputs:
 
 ```text
 reports\ncu_gpt2_decoder.ncu-rep
@@ -221,19 +146,13 @@ reports\ncu_vit_encoder.ncu-rep
 reports\ncu_vit_encoder_meta.json
 ```
 
-If your Nsight Compute launcher is in a different location, override it:
+If needed, override the `ncu.bat` path:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target GPT2_Decoder_Step -NsightComputeBat "D:\programs\Nsight Computer\ncu.bat"
+powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target GPT2_Decoder_Step -NsightComputeBat "D:\programs\Nsight Compute\ncu.bat"
 ```
 
-8. **Manual fallback commands** (only if you need them):
+## Notes
 
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8001 --reload
-.\.venv\Scripts\python.exe -m chainlit run frontend/chainlit_app.py -w --host 127.0.0.1 --port 8000
-.\.venv\Scripts\python.exe core\scripts\benchmark_baseline.py --frames-dir "data\processed\msvd\val\frames\0lh_UWF9ZP4_21_26" --device cuda
-.\.venv\Scripts\python.exe core\scripts\profile_nsight.py --frames-dir "data\processed\msvd\val\frames\0lh_UWF9ZP4_21_26" --device cuda
-```
-
-
+- Benchmarking and profiling scripts default to offline model loading unless you explicitly enable online checks.
+- Generated reports under `reports/` are local artifacts and may differ by machine, driver, CUDA version, and installed profiler tooling.
