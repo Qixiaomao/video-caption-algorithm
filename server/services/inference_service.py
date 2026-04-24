@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
-from core.config import InferenceConfig
+from core.config import InferenceConfig, ViTOptimizeConfig
 from server.schemas import InferRequest
 from server.services.model_registry import MODEL_REGISTRY
 from server.services.task_manager import GPU_TASK_MANAGER
@@ -27,6 +27,19 @@ def request_to_config(req: InferRequest) -> InferenceConfig:
         prompt3=req.prompt3,
         device=req.device,
         backend=req.backend,
+        vit_opt=ViTOptimizeConfig(
+            enable_fp16=req.vit_enable_fp16,
+            enable_attention_fastpath=req.vit_enable_attention_fastpath,
+            prefer_channels_last=req.vit_prefer_channels_last,
+            enable_torch_compile=req.vit_enable_torch_compile,
+            torch_compile_mode=req.vit_torch_compile_mode,
+            enable_mlp_bias_gelu_fusion=req.vit_enable_mlp_bias_gelu_fusion,
+            enable_residual_layernorm_fusion=req.vit_enable_residual_layernorm_fusion,
+            enable_cupy_fused_pool=req.vit_enable_cupy_fused_pool,
+            cupy_pool_force_fp16=req.vit_cupy_pool_force_fp16,
+        ),
+        use_cupy_prefix_projector=req.use_cupy_prefix_projector,
+        cupy_prefix_force_fp16=req.cupy_prefix_force_fp16,
     )
 
 
@@ -48,4 +61,13 @@ class InferenceService:
 
 
 INFERENCE_SERVICE = InferenceService()
+
+
+
+
+
+
+
+
+
 

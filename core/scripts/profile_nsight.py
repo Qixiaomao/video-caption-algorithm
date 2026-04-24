@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -12,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import torch
 
 import backend_config
-from core.config import InferenceConfig
+from core.config import InferenceConfig, ViTOptimizeConfig
 from core.env import assert_core_runtime_ready
 from core.models.model_loader import load_caption_model
 from core.preprocessing.frame_loader import load_video_tensor
@@ -33,8 +34,22 @@ class NvtxRange:
         return False
 
 
+def autocast_context(device: torch.device, enabled: bool):
+    if not enabled or device.type != "cuda":
+        return nullcontext()
+    return torch.autocast(device_type="cuda", dtype=torch.float16)
+
+
 @torch.inference_mode()
-def run_one_profile(model, config: InferenceConfig, frames_dir: str, prompt: str, max_new_tokens: int):
+def run_one_profile(
+    model,
+    config: InferenceConfig,
+    frames_dir: str,
+    prompt: str,
+    max_new_tokens: int,
+    use_autocast_fp16: bool,
+):
+    profile_device = torch.device(config.device)
     with NvtxRange("Inference_Once"):
         with NvtxRange("Preprocessing"):
             video = load_video_tensor(
@@ -45,24 +60,26 @@ def run_one_profile(model, config: InferenceConfig, frames_dir: str, prompt: str
             )
 
         with NvtxRange("ViT_Encoder"):
-            encoder_out = model.encoder(video)
+            with autocast_context(profile_device, use_autocast_fp16):
+                encoder_out = model.encoder(video)
 
         with NvtxRange("Cross_Modal_Alignment"):
-            emb = model.proj(encoder_out)
-            if emb.dim() == 2:
-                emb = emb.unsqueeze(1)
-            if config.ln_scale is not None and config.ln_scale > 0:
-                emb = torch.nn.functional.layer_norm(emb, emb.shape[-1:]) * config.ln_scale
-            if config.in_weight is not None and config.in_weight > 0:
-                emb = emb * config.in_weight
+            with autocast_context(profile_device, use_autocast_fp16):
+                emb = model.proj(encoder_out)
+                if emb.dim() == 2:
+                    emb = emb.unsqueeze(1)
+                if config.ln_scale is not None and config.ln_scale > 0:
+                    emb = torch.nn.functional.layer_norm(emb, emb.shape[-1:]) * config.ln_scale
+                if config.in_weight is not None and config.in_weight > 0:
+                    emb = emb * config.in_weight
 
-            if model.decoder.cond_mode == "prefix":
-                hidden = model.decoder.model.config.n_embd
-                prefix_embeds = model.decoder.mapper(emb).view(emb.size(0), model.decoder.prefix_len, hidden)
-            else:
-                prefix_embeds = model.decoder.mapper(emb)
-                if prefix_embeds.dim() == 2:
-                    prefix_embeds = prefix_embeds.unsqueeze(1)
+                if model.decoder.cond_mode == "prefix":
+                    hidden = model.decoder.model.config.n_embd
+                    prefix_embeds = model.decoder.mapper(emb).view(emb.size(0), model.decoder.prefix_len, hidden)
+                else:
+                    prefix_embeds = model.decoder.mapper(emb)
+                    if prefix_embeds.dim() == 2:
+                        prefix_embeds = prefix_embeds.unsqueeze(1)
 
         decoder = model.decoder
         tokenizer = decoder.tokenizer
@@ -77,8 +94,9 @@ def run_one_profile(model, config: InferenceConfig, frames_dir: str, prompt: str
                 bos_token_id = tokenizer.eos_token_id
             prompt_ids = torch.tensor([[bos_token_id]], dtype=torch.long, device=device)
 
-        prompt_embeds = gpt2.transformer.wte(prompt_ids)
-        next_input_embeds = torch.cat([prefix_embeds, prompt_embeds], dim=1)
+        with autocast_context(device, use_autocast_fp16):
+            prompt_embeds = gpt2.transformer.wte(prompt_ids)
+            next_input_embeds = torch.cat([prefix_embeds, prompt_embeds], dim=1)
         running_attention_mask = torch.ones(next_input_embeds.shape[:2], dtype=torch.long, device=device)
         past_key_values = None
         generated_tokens: list[int] = []
@@ -86,13 +104,14 @@ def run_one_profile(model, config: InferenceConfig, frames_dir: str, prompt: str
         with NvtxRange("GPT2_Decoder_Step"):
             for step_idx in range(max_new_tokens):
                 with NvtxRange(f"GPT2_Decoder_Step/token_{step_idx:02d}"):
-                    outputs = gpt2(
-                        inputs_embeds=next_input_embeds,
-                        attention_mask=running_attention_mask,
-                        past_key_values=past_key_values,
-                        use_cache=True,
-                        return_dict=True,
-                    )
+                    with autocast_context(device, use_autocast_fp16):
+                        outputs = gpt2(
+                            inputs_embeds=next_input_embeds,
+                            attention_mask=running_attention_mask,
+                            past_key_values=past_key_values,
+                            use_cache=True,
+                            return_dict=True,
+                        )
 
                 logits = outputs.logits[:, -1, :]
                 next_token = torch.argmax(logits, dim=-1)
@@ -103,7 +122,8 @@ def run_one_profile(model, config: InferenceConfig, frames_dir: str, prompt: str
                 if token_id == tokenizer.eos_token_id:
                     break
 
-                next_input_embeds = gpt2.transformer.wte(next_token).unsqueeze(1)
+                with autocast_context(device, use_autocast_fp16):
+                    next_input_embeds = gpt2.transformer.wte(next_token).unsqueeze(1)
                 running_attention_mask = torch.cat(
                     [
                         running_attention_mask,
@@ -139,6 +159,20 @@ def build_config(args: argparse.Namespace) -> InferenceConfig:
         in_weight=args.in_weight,
         device=args.device,
         backend="torch",
+        vit_opt=ViTOptimizeConfig(
+            enable_fp16=backend_config.VIT_ENABLE_FP16,
+            enable_attention_fastpath=backend_config.VIT_ENABLE_ATTENTION_FASTPATH,
+            prefer_channels_last=backend_config.VIT_PREFER_CHANNELS_LAST,
+            enable_torch_compile=backend_config.VIT_ENABLE_TORCH_COMPILE,
+            torch_compile_mode=backend_config.VIT_TORCH_COMPILE_MODE,
+            enable_mlp_bias_gelu_fusion=backend_config.VIT_ENABLE_MLP_BIAS_GELU_FUSION,
+            enable_residual_layernorm_fusion=backend_config.VIT_ENABLE_RESIDUAL_LAYERNORM_FUSION,
+            enable_inplace_residual_add_fusion=backend_config.VIT_ENABLE_INPLACE_RESIDUAL_ADD_FUSION,
+            enable_cupy_fused_pool=backend_config.VIT_ENABLE_CUPY_FUSED_POOL,
+            cupy_pool_force_fp16=backend_config.VIT_CUPY_POOL_FORCE_FP16,
+        ),
+        use_cupy_prefix_projector=backend_config.USE_CUPY_PREFIX_PROJECTOR,
+        cupy_prefix_force_fp16=backend_config.CUPY_PREFIX_FORCE_FP16,
     )
 
 
@@ -157,6 +191,7 @@ def parse_args():
     parser.add_argument("--prompt", default=backend_config.PROMPT3)
     parser.add_argument("--max-new-tokens", type=int, default=24)
     parser.add_argument("--warmup", type=int, default=3)
+    parser.add_argument("--use-autocast-fp16", action="store_true", help="Enable CUDA autocast(fp16) during the profiled run")
     parser.add_argument("--export-json", default="", help="Optional JSON output path for single-run metadata")
     return parser.parse_args()
 
@@ -178,17 +213,18 @@ def main():
     print(f"device: {env['device']}")
     print(f"frames_dir: {args.frames_dir}")
     print(f"ckpt: {args.ckpt}")
+    print(f"precision: {'fp16_autocast' if args.use_autocast_fp16 else 'fp32'}")
     if args.export_json:
         print(f"export_json: {args.export_json}")
     print()
 
     for _ in range(args.warmup):
-        _ = run_one_profile(model, config, args.frames_dir, args.prompt, args.max_new_tokens)
+        _ = run_one_profile(model, config, args.frames_dir, args.prompt, args.max_new_tokens, args.use_autocast_fp16)
         torch.cuda.synchronize(device)
 
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats(device)
-    result = run_one_profile(model, config, args.frames_dir, args.prompt, args.max_new_tokens)
+    result = run_one_profile(model, config, args.frames_dir, args.prompt, args.max_new_tokens, args.use_autocast_fp16)
     torch.cuda.synchronize(device)
     peak_memory_mb = torch.cuda.max_memory_allocated(device) / MB
 
@@ -210,6 +246,7 @@ def main():
                         "prompt": args.prompt,
                         "warmup": args.warmup,
                         "max_new_tokens": args.max_new_tokens,
+                        "precision": "fp16_autocast" if args.use_autocast_fp16 else "fp32",
                         "num_frames": args.num_frames,
                         "image_size": args.image_size,
                         "prefix_len": args.prefix_len,
@@ -231,3 +268,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -28,6 +28,22 @@ class TensorRTConfig:
     plugin_namespace: str = "video_caption_plugins"
 
 
+
+@dataclass(frozen=True)
+class ViTOptimizeConfig:
+    """ViT encoder runtime optimization switches for inference."""
+
+    enable_fp16: bool = False
+    enable_attention_fastpath: bool = True
+    prefer_channels_last: bool = True
+    enable_torch_compile: bool = True
+    torch_compile_mode: str = "reduce-overhead"
+    enable_mlp_bias_gelu_fusion: bool = True
+    enable_residual_layernorm_fusion: bool = True
+    enable_inplace_residual_add_fusion: bool = True
+    enable_cupy_fused_pool: bool = False
+    cupy_pool_force_fp16: bool = True
+
 @dataclass(frozen=True)
 class InferenceConfig:
     """Stateless core inference configuration."""
@@ -51,4 +67,14 @@ class InferenceConfig:
     backend: str = "torch"
     memory: MemoryConfig = MemoryConfig()
     tensorrt: TensorRTConfig = TensorRTConfig()
+    vit_opt: ViTOptimizeConfig = ViTOptimizeConfig()
+    use_cupy_prefix_projector: bool = False
+    cupy_prefix_force_fp16: bool = True
+
+
+
+
+
+
+
 

@@ -9,12 +9,41 @@ param(
     [string]$Trace = 'cuda,nvtx',
     [string]$CaptureRange = 'Inference_Once',
     [switch]$UseNvtxCaptureRange,
+    [switch]$UseAutocastFp16,
     [switch]$AllowOnlineModelChecks
 )
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+
+function Resolve-NsysCliExe {
+    param([string]$InputPath)
+
+    if ([string]::IsNullOrWhiteSpace($InputPath)) {
+        return $null
+    }
+
+    if (Test-Path $InputPath) {
+        $leaf = Split-Path $InputPath -Leaf
+        if ($leaf -ieq 'nsys-ui.exe') {
+            $candidate = Join-Path (Split-Path $InputPath -Parent) 'nsys.exe'
+            if (Test-Path $candidate) {
+                Write-Host "[WARN] Received nsys-ui.exe. Switching to CLI binary: $candidate"
+                return $candidate
+            }
+
+            $targetSibling = Join-Path (Split-Path (Split-Path $InputPath -Parent) -Parent) 'target-windows-x64\nsys.exe'
+            if (Test-Path $targetSibling) {
+                Write-Host "[WARN] Received nsys-ui.exe. Switching to CLI binary: $targetSibling"
+                return $targetSibling
+            }
+        }
+        return $InputPath
+    }
+
+    return $InputPath
+}
 
 $CheckScript = Join-Path $PSScriptRoot 'check_project_env.ps1'
 & powershell -ExecutionPolicy Bypass -File $CheckScript
@@ -28,6 +57,11 @@ if (-not $AllowOnlineModelChecks) {
     Write-Host '[ENV] Hugging Face offline mode enabled for local-model profiling'
 }
 
+if ($NsightSystemsExe -match 'nsys-ui\.exe$') {
+    Write-Host "[WARN] NsightSystemsExe points to nsys-ui.exe (GUI). CLI args require nsys.exe."
+}
+$NsightSystemsExe = Resolve-NsysCliExe -InputPath $NsightSystemsExe
+
 if (!(Test-Path $NsightSystemsExe)) {
     Write-Error "Nsight Systems executable not found: $NsightSystemsExe"
 }
@@ -35,8 +69,9 @@ if (!(Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir | Out-Null
 }
 
-$NsysOutputBase = Join-Path $OutputDir 'profile_once'
-$ProfileJson = Join-Path $OutputDir 'profile_once.json'
+$ProfileStem = if ($UseAutocastFp16) { 'profile_once_fp16' } else { 'profile_once' }
+$NsysOutputBase = Join-Path $OutputDir $ProfileStem
+$ProfileJson = Join-Path $OutputDir ($ProfileStem + '.json')
 $ExpectedReports = @(
     "$NsysOutputBase.nsys-rep",
     "$NsysOutputBase.qdrep",
@@ -82,10 +117,18 @@ if ($UseNvtxCaptureRange) {
         '--max-new-tokens', $MaxNewTokens,
         '--export-json', $ProfileJson
     )
-    Write-Host "[RUN] Nsight Systems profile (NVTX capture range: $CaptureRange)"
+}
+
+if ($UseAutocastFp16) {
+    $ArgsList += '--use-autocast-fp16'
+}
+
+$PrecisionTag = if ($UseAutocastFp16) { 'fp16_autocast' } else { 'fp32' }
+if ($UseNvtxCaptureRange) {
+    Write-Host "[RUN] Nsight Systems profile (NVTX capture range: $CaptureRange, precision=$PrecisionTag)"
 }
 else {
-    Write-Host '[RUN] Nsight Systems profile (whole process capture)'
+    Write-Host "[RUN] Nsight Systems profile (whole process capture, precision=$PrecisionTag)"
 }
 
 & $NsightSystemsExe @ArgsList

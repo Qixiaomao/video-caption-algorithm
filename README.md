@@ -112,6 +112,10 @@ Run Nsight Systems:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_nsys.ps1
 ```
 
+Important:
+- `nsys-ui.exe` is the GUI launcher and does not accept CLI profiling flags like `profile --trace ...`.
+- Use the CLI binary `nsys.exe` (typically under `target-windows-x64`).
+
 Default outputs:
 
 ```text

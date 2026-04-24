@@ -7,6 +7,7 @@ param(
     [int]$MaxNewTokens = 24,
     [string]$OutputDir = 'reports',
     [string]$NsightComputeBat = 'D:\programs\Nsight Computer\ncu.bat',
+    [switch]$UseAutocastFp16,
     [switch]$AllowOnlineModelChecks
 )
 
@@ -34,12 +35,24 @@ if (!(Test-Path $OutputDir)) {
 }
 
 if ($Target -eq 'ViT_Encoder') {
-    $OutputBase = Join-Path $OutputDir 'ncu_vit_encoder'
-    $MetaJson = Join-Path $OutputDir 'ncu_vit_encoder_meta.json'
+    if ($UseAutocastFp16) {
+        $OutputBase = Join-Path $OutputDir 'ncu_vit_encoder_fp16'
+        $MetaJson = Join-Path $OutputDir 'ncu_vit_encoder_fp16_meta.json'
+    }
+    else {
+        $OutputBase = Join-Path $OutputDir 'ncu_vit_encoder'
+        $MetaJson = Join-Path $OutputDir 'ncu_vit_encoder_meta.json'
+    }
 }
 else {
-    $OutputBase = Join-Path $OutputDir 'ncu_gpt2_decoder'
-    $MetaJson = Join-Path $OutputDir 'ncu_gpt2_decoder_meta.json'
+    if ($UseAutocastFp16) {
+        $OutputBase = Join-Path $OutputDir 'ncu_gpt2_decoder_fp16'
+        $MetaJson = Join-Path $OutputDir 'ncu_gpt2_decoder_fp16_meta.json'
+    }
+    else {
+        $OutputBase = Join-Path $OutputDir 'ncu_gpt2_decoder'
+        $MetaJson = Join-Path $OutputDir 'ncu_gpt2_decoder_meta.json'
+    }
 }
 
 $ArgsList = @(
@@ -57,7 +70,12 @@ $ArgsList = @(
     '--export-json', $MetaJson
 )
 
-Write-Host "[RUN] Nsight Compute target: $Target"
+if ($UseAutocastFp16) {
+    $ArgsList += '--use-autocast-fp16'
+}
+
+$PrecisionTag = if ($UseAutocastFp16) { 'fp16_autocast' } else { 'fp32' }
+Write-Host "[RUN] Nsight Compute target: $Target (precision=$PrecisionTag)"
 & $NsightComputeBat @ArgsList
 
 Write-Host "[DONE] Nsight Compute output base: $OutputBase"

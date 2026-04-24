@@ -26,6 +26,8 @@ eval_results/
 figs/
 outputs/
 runs/
+# --- Local CUDA/CuPy cache ---
+.cupy_cache/
 # --- Local environment and secrets ---
 .env
 .venv/

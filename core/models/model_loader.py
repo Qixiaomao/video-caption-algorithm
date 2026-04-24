@@ -56,6 +56,18 @@ def load_torch_caption_model(config: InferenceConfig):
         prefix_len=config.prefix_len,
         freeze_vit=True,
         unfreeze_last=0,
+        vit_enable_fp16=config.vit_opt.enable_fp16,
+        vit_enable_attention_fastpath=config.vit_opt.enable_attention_fastpath,
+        vit_prefer_channels_last=config.vit_opt.prefer_channels_last,
+        vit_enable_torch_compile=config.vit_opt.enable_torch_compile,
+        vit_torch_compile_mode=config.vit_opt.torch_compile_mode,
+        vit_enable_mlp_bias_gelu_fusion=config.vit_opt.enable_mlp_bias_gelu_fusion,
+        vit_enable_residual_layernorm_fusion=config.vit_opt.enable_residual_layernorm_fusion,
+        vit_enable_inplace_residual_add_fusion=config.vit_opt.enable_inplace_residual_add_fusion,
+        vit_enable_cupy_fused_pool=config.vit_opt.enable_cupy_fused_pool,
+        vit_cupy_pool_force_fp16=config.vit_opt.cupy_pool_force_fp16,
+        use_cupy_prefix_projector=config.use_cupy_prefix_projector,
+        cupy_prefix_force_fp16=config.cupy_prefix_force_fp16,
     ).to(config.device).eval()
 
     state = _load_checkpoint(Path(config.ckpt), config.device)
@@ -67,3 +79,14 @@ def load_torch_caption_model(config: InferenceConfig):
     if unexpected:
         log.warning("unexpected keys (<=6): %s", unexpected[:6])
     return model
+
+
+
+
+
+
+
+
+
+
+

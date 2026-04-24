@@ -4,10 +4,12 @@ param(
     [string]$FramesDir = 'data\processed\msvd\val\frames\0lh_UWF9ZP4_21_26',
     [string]$Device = 'cuda',
     [string]$Checkpoint = 'checkpoints\msvd_mapper_finetune_v2.pt',
+    [string]$BatchSizes = '1',
     [int]$Warmup = 10,
     [int]$Iters = 50,
     [int]$MaxNewTokens = 24,
     [string]$OutputDir = 'reports',
+    [switch]$UseAutocastFp16,
     [switch]$AllowOnlineModelChecks
 )
 
@@ -32,18 +34,33 @@ if (!(Test-Path $OutputDir)) {
 }
 
 if ($Mode -eq 'benchmark') {
+    $IsBatchSweep = $BatchSizes.Contains(',')
+    $BenchmarkScript = if ($UseAutocastFp16) { 'core\scripts\benchmark_baseline_fp16.py' } else { 'core\scripts\benchmark_baseline.py' }
+    $CsvName = if ($UseAutocastFp16) {
+        if ($IsBatchSweep) { 'benchmark_bs_comparison_fp16.csv' } else { 'baseline_fp16_iterations.csv' }
+    } else {
+        if ($IsBatchSweep) { 'benchmark_bs_comparison.csv' } else { 'baseline_iterations.csv' }
+    }
+    $JsonName = if ($UseAutocastFp16) {
+        if ($IsBatchSweep) { 'benchmark_bs_summary_fp16.json' } else { 'baseline_fp16_summary.json' }
+    } else {
+        if ($IsBatchSweep) { 'benchmark_bs_summary.json' } else { 'baseline_summary.json' }
+    }
+
     $ArgsList = @(
-        'core\scripts\benchmark_baseline.py',
+        $BenchmarkScript,
         '--frames-dir', $FramesDir,
         '--ckpt', $Checkpoint,
         '--device', $Device,
+        '--batch-sizes', $BatchSizes,
         '--warmup', $Warmup,
         '--iters', $Iters,
         '--max-new-tokens', $MaxNewTokens,
-        '--export-csv', (Join-Path $OutputDir 'baseline_iterations.csv'),
-        '--export-json', (Join-Path $OutputDir 'baseline_summary.json')
+        '--export-csv', (Join-Path $OutputDir $CsvName),
+        '--export-json', (Join-Path $OutputDir $JsonName)
     )
-    Write-Host "[RUN] benchmark baseline"
+    $PrecisionTag = if ($UseAutocastFp16) { 'fp16_autocast' } else { 'fp32_baseline' }
+    Write-Host "[RUN] benchmark baseline (precision=$PrecisionTag, batch_sizes=$BatchSizes)"
     & $VenvPython @ArgsList
 }
 else {
