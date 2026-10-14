@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -43,6 +43,7 @@ class ViTOptimizeConfig:
     enable_inplace_residual_add_fusion: bool = True
     enable_cupy_fused_pool: bool = False
     cupy_pool_force_fp16: bool = True
+    enable_cuda_graph: bool = False
 
 @dataclass(frozen=True)
 class InferenceConfig:
@@ -55,8 +56,10 @@ class InferenceConfig:
     prefix_len: int = 4
     num_frames: int = 8
     image_size: int = 224
-    ln_scale: float = 0.6
-    in_weight: float = 0.4
+    # Disabled by default: recovery training does not normalize or rescale the
+    # visual embedding before decoder.mapper.
+    ln_scale: float = 0.0
+    in_weight: float = 0.0
     preset1: str = "precise"
     preset2: str = "precise"
     preset3: str = "natural"

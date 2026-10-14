@@ -1,14 +1,19 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import csv
 import gc
+import hashlib
 import json
 import math
+import platform
 import statistics
+import subprocess
 import sys
 import time
 from collections import defaultdict
+from dataclasses import asdict
+from importlib import metadata
 from pathlib import Path
 from typing import Callable
 
@@ -22,7 +27,7 @@ import backend_config
 from core.config import InferenceConfig, ViTOptimizeConfig
 from core.env import assert_core_runtime_ready
 from core.models.model_loader import load_caption_model
-from core.preprocessing.frame_loader import load_video_tensor
+from core.preprocessing.frame_loader import list_frames, load_video_tensor
 
 MB = 1024.0 * 1024.0
 DEFAULT_BATCH_SIZES = [1, 2, 4, 8, 12, 16]
@@ -52,6 +57,7 @@ class BenchmarkProfiler:
         self.preprocess_host_ms: list[float] = []
         self.throughput_samples: list[float] = []
         self.last_texts: list[str] = []
+        self.last_video_ids: list[str] = []
         self.max_memory_allocated_mb: float = 0.0
 
     def clear_measurements(self):
@@ -63,6 +69,7 @@ class BenchmarkProfiler:
         self.preprocess_host_ms.clear()
         self.throughput_samples.clear()
         self.last_texts = []
+        self.last_video_ids = []
         self.max_memory_allocated_mb = 0.0
 
     def update_global_peak(self) -> float:
@@ -85,21 +92,23 @@ class BenchmarkProfiler:
         self.stage_peak_mem_mb[name].append(peak_mem_mb)
         return out, latency_ms, peak_mem_mb
 
-    def preprocess_stage(self, frames_dir: str, num_frames: int, image_size: int, batch_size: int):
+    def preprocess_stage(self, frame_dirs: list[Path], num_frames: int, image_size: int):
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
         torch.cuda.synchronize(self.device)
         host_t0 = time.perf_counter()
         with NvtxRange("Preprocessing"):
             start_event.record()
-            video = load_video_tensor(
-                frames_dir,
-                num_frames=num_frames,
-                image_size=image_size,
-                device=str(self.device),
-            )
-            if batch_size > 1:
-                video = video.repeat(batch_size, 1, 1, 1, 1)
+            videos = [
+                load_video_tensor(
+                    frame_dir,
+                    num_frames=num_frames,
+                    image_size=image_size,
+                    device=str(self.device),
+                )
+                for frame_dir in frame_dirs
+            ]
+            video = torch.cat(videos, dim=0)
             end_event.record()
         torch.cuda.synchronize(self.device)
         host_ms = (time.perf_counter() - host_t0) * 1000.0
@@ -108,7 +117,39 @@ class BenchmarkProfiler:
         self.preprocess_host_ms.append(host_ms)
         self.stage_samples["Preprocessing"].append(cuda_ms)
         self.stage_peak_mem_mb["Preprocessing"].append(peak_mem_mb)
+        self.last_video_ids = [frame_dir.name for frame_dir in frame_dirs]
         return video, cuda_ms, host_ms, peak_mem_mb
+
+
+def resolve_batch_frame_dirs(frames_root: str | Path, batch_size: int, allow_repeated_input: bool = False) -> list[Path]:
+    """Resolve one real frame directory per batch item.
+
+    ``frames_root`` may be a single video directory or a split-level directory
+    containing one subdirectory per video. Repeating a single input is rejected
+    unless the caller explicitly labels the run as synthetic.
+    """
+
+    root = Path(frames_root)
+    if not root.exists() or not root.is_dir():
+        raise FileNotFoundError(f"frames path is not a directory: {root}")
+
+    if list_frames(root):
+        candidates = [root]
+    else:
+        candidates = sorted(
+            child for child in root.iterdir() if child.is_dir() and list_frames(child)
+        )
+
+    if not candidates:
+        raise FileNotFoundError(f"no video directories containing frame_*.jpg under {root}")
+    if len(candidates) >= batch_size:
+        return candidates[:batch_size]
+    if allow_repeated_input:
+        return [candidates[index % len(candidates)] for index in range(batch_size)]
+    raise ValueError(
+        f"batch size {batch_size} requires {batch_size} distinct videos, but only "
+        f"{len(candidates)} were found under {root}. Pass --allow-repeated-input only for a labelled synthetic microbenchmark."
+    )
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -128,11 +169,22 @@ def percentile(values: list[float], q: float) -> float:
 
 def stats_dict(values: list[float]) -> dict[str, float | int | None]:
     if not values:
-        return {"count": 0, "mean_ms": None, "std_ms": None, "p99_ms": None, "max_ms": None, "min_ms": None}
+        return {
+            "count": 0,
+            "mean_ms": None,
+            "std_ms": None,
+            "p50_ms": None,
+            "p95_ms": None,
+            "p99_ms": None,
+            "max_ms": None,
+            "min_ms": None,
+        }
     return {
         "count": len(values),
         "mean_ms": statistics.mean(values),
         "std_ms": statistics.pstdev(values) if len(values) > 1 else 0.0,
+        "p50_ms": percentile(values, 0.50),
+        "p95_ms": percentile(values, 0.95),
         "p99_ms": percentile(values, 0.99),
         "max_ms": max(values),
         "min_ms": min(values),
@@ -157,27 +209,74 @@ def throughput_stats_dict(values: list[float]) -> dict[str, float | int | None]:
     }
 
 
+def select_greedy_token(
+    logits: torch.Tensor,
+    eos_token_id: int | None,
+    step_index: int,
+    min_new_tokens: int,
+) -> torch.Tensor:
+    """Select the next token while matching HF ``min_new_tokens`` EOS masking."""
+
+    if eos_token_id is not None and step_index < min_new_tokens:
+        logits = logits.clone()
+        logits[:, eos_token_id] = -torch.inf
+    return torch.argmax(logits, dim=-1)
+
+
+def validate_decoder_outputs(texts: list[str], token_counts: list[int], min_new_tokens: int) -> None:
+    """Reject latency samples that did not produce usable caption output."""
+
+    if len(texts) != len(token_counts):
+        raise RuntimeError("decoder output mismatch: texts and token counts have different batch sizes")
+    invalid = [
+        index
+        for index, (text, count) in enumerate(zip(texts, token_counts))
+        if not text.strip() or count < min_new_tokens
+    ]
+    if invalid:
+        details = ", ".join(
+            f"sample={index}:tokens={token_counts[index]}:empty={not texts[index].strip()}" for index in invalid
+        )
+        raise RuntimeError(
+            "invalid caption benchmark output; latency sample is rejected. "
+            f"Required non-empty text and at least {min_new_tokens} generated tokens. {details}"
+        )
+
+
+def build_decoder_context(model, prefix_embeds: torch.Tensor, prompt: str) -> torch.Tensor:
+    """Build the inference context without inserting an unseen BOS/EOS token."""
+
+    if not prompt:
+        return prefix_embeds
+
+    tokenizer = model.decoder.tokenizer
+    gpt2 = model.decoder.model
+    prompt_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(prefix_embeds.device)
+    if prompt_ids.shape[0] == 1 and prefix_embeds.shape[0] > 1:
+        prompt_ids = prompt_ids.expand(prefix_embeds.shape[0], -1)
+    prompt_embeds = gpt2.transformer.wte(prompt_ids)
+    return torch.cat([prefix_embeds, prompt_embeds], dim=1)
+
+
 @torch.inference_mode()
-def run_decoder_steps(model, prefix_embeds: torch.Tensor, prompt: str, max_new_tokens: int, profiler: BenchmarkProfiler):
+def run_decoder_steps(
+    model,
+    prefix_embeds: torch.Tensor,
+    prompt: str,
+    max_new_tokens: int,
+    min_new_tokens: int,
+    profile_token_steps: bool,
+    profiler: BenchmarkProfiler,
+):
+    if min_new_tokens < 0 or max_new_tokens <= 0 or min_new_tokens > max_new_tokens:
+        raise ValueError("require 0 <= min_new_tokens <= max_new_tokens and max_new_tokens > 0")
     decoder = model.decoder
     tokenizer = decoder.tokenizer
     gpt2 = decoder.model
     device = prefix_embeds.device
     batch_size = prefix_embeds.shape[0]
 
-    if prompt:
-        prompt_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-    else:
-        bos_token_id = tokenizer.bos_token_id
-        if bos_token_id is None:
-            bos_token_id = tokenizer.eos_token_id
-        prompt_ids = torch.tensor([[bos_token_id]], dtype=torch.long, device=device)
-
-    if prompt_ids.shape[0] == 1 and batch_size > 1:
-        prompt_ids = prompt_ids.expand(batch_size, -1)
-
-    prompt_embeds = gpt2.transformer.wte(prompt_ids)
-    full_inputs = torch.cat([prefix_embeds, prompt_embeds], dim=1)
+    full_inputs = build_decoder_context(model, prefix_embeds, prompt)
     running_attention_mask = torch.ones(full_inputs.shape[:2], dtype=torch.long, device=device)
 
     generated_tokens = [[] for _ in range(batch_size)]
@@ -188,28 +287,38 @@ def run_decoder_steps(model, prefix_embeds: torch.Tensor, prompt: str, max_new_t
 
     with NvtxRange("GPT2_Decoder_Step"):
         for step_idx in range(max_new_tokens):
-            start_event = torch.cuda.Event(enable_timing=True)
-            end_event = torch.cuda.Event(enable_timing=True)
             step_name = f"GPT2_Decoder_Step/token_{step_idx:02d}"
-            torch.cuda.synchronize(device)
-            with NvtxRange(step_name):
-                start_event.record()
-                outputs = gpt2(
-                    inputs_embeds=next_input_embeds,
-                    attention_mask=running_attention_mask,
-                    past_key_values=past_key_values,
-                    use_cache=True,
-                    return_dict=True,
-                )
-                end_event.record()
-            torch.cuda.synchronize(device)
-            step_ms = start_event.elapsed_time(end_event)
-            step_samples.append(step_ms)
-            profiler.token_step_ms.append(step_ms)
+            if profile_token_steps:
+                start_event = torch.cuda.Event(enable_timing=True)
+                end_event = torch.cuda.Event(enable_timing=True)
+                torch.cuda.synchronize(device)
+                with NvtxRange(step_name):
+                    start_event.record()
+                    outputs = gpt2(
+                        inputs_embeds=next_input_embeds,
+                        attention_mask=running_attention_mask,
+                        past_key_values=past_key_values,
+                        use_cache=True,
+                        return_dict=True,
+                    )
+                    end_event.record()
+                torch.cuda.synchronize(device)
+                step_ms = start_event.elapsed_time(end_event)
+                step_samples.append(step_ms)
+                profiler.token_step_ms.append(step_ms)
+            else:
+                with NvtxRange(step_name):
+                    outputs = gpt2(
+                        inputs_embeds=next_input_embeds,
+                        attention_mask=running_attention_mask,
+                        past_key_values=past_key_values,
+                        use_cache=True,
+                        return_dict=True,
+                    )
 
             logits = outputs.logits[:, -1, :]
-            next_token = torch.argmax(logits, dim=-1)
             eos_token_id = tokenizer.eos_token_id
+            next_token = select_greedy_token(logits, eos_token_id, step_idx, min_new_tokens)
             if eos_token_id is not None:
                 next_token = torch.where(finished, torch.full_like(next_token, eos_token_id), next_token)
 
@@ -232,10 +341,12 @@ def run_decoder_steps(model, prefix_embeds: torch.Tensor, prompt: str, max_new_t
 
     profiler.generated_lengths.extend(len(tokens) for tokens in generated_tokens)
     texts = [tokenizer.decode(tokens, skip_special_tokens=True).strip() for tokens in generated_tokens]
+    token_counts = [len(tokens) for tokens in generated_tokens]
+    validate_decoder_outputs(texts, token_counts, min_new_tokens)
     profiler.last_texts = texts
     return {
         "texts": texts,
-        "token_count": [len(tokens) for tokens in generated_tokens],
+        "token_count": token_counts,
         "token_step_ms": step_samples,
     }
 
@@ -244,11 +355,12 @@ def run_decoder_steps(model, prefix_embeds: torch.Tensor, prompt: str, max_new_t
 def run_one_iteration(
     model,
     config: InferenceConfig,
-    frames_dir: str,
+    frame_dirs: list[Path],
     prompt: str,
     max_new_tokens: int,
+    min_new_tokens: int,
+    profile_token_steps: bool,
     profiler: BenchmarkProfiler,
-    batch_size: int,
 ):
     torch.cuda.empty_cache()
     gc.collect()
@@ -256,11 +368,11 @@ def run_one_iteration(
     iter_t0 = time.perf_counter()
 
     video, preprocess_cuda_ms, preprocess_host_ms, preprocess_peak_mb = profiler.preprocess_stage(
-        frames_dir=frames_dir,
+        frame_dirs=frame_dirs,
         num_frames=config.num_frames,
         image_size=config.image_size,
-        batch_size=batch_size,
     )
+    batch_size = len(frame_dirs)
 
     encoder_out, encoder_ms, encoder_peak_mb = profiler.cuda_stage("ViT_Encoder", lambda: model.encoder(video))
 
@@ -285,7 +397,15 @@ def run_one_iteration(
     prefix_embeds, align_ms, align_peak_mb = profiler.cuda_stage("Cross_Modal_Alignment", align_fn)
     decoder_result, decoder_ms, decoder_peak_mb = profiler.cuda_stage(
         "GPT2_Decoder_Step",
-        lambda: run_decoder_steps(model, prefix_embeds, prompt, max_new_tokens, profiler),
+        lambda: run_decoder_steps(
+            model,
+            prefix_embeds,
+            prompt,
+            max_new_tokens,
+            min_new_tokens,
+            profile_token_steps,
+            profiler,
+        ),
     )
 
     iter_ms = (time.perf_counter() - iter_t0) * 1000.0
@@ -295,6 +415,7 @@ def run_one_iteration(
     profiler.update_global_peak()
     return {
         "batch_size": batch_size,
+        "input_video_ids": [frame_dir.name for frame_dir in frame_dirs],
         "iteration_ms": iter_ms,
         "throughput_samples_per_s": throughput,
         "captions": decoder_result["texts"],
@@ -318,12 +439,106 @@ def run_one_iteration(
 
 def get_env(device: torch.device) -> dict[str, object]:
     props = torch.cuda.get_device_properties(device)
+    def package_version(name: str) -> str | None:
+        try:
+            return metadata.version(name)
+        except metadata.PackageNotFoundError:
+            return None
+
     return {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
         "torch": torch.__version__,
         "torch_cuda": torch.version.cuda,
+        "timm": package_version("timm"),
+        "transformers": package_version("transformers"),
+        "cupy": package_version("cupy-cuda12x") or package_version("cupy"),
+        "triton": package_version("triton"),
         "device": torch.cuda.get_device_name(device),
         "compute_capability": f"{props.major}.{props.minor}",
         "total_vram_mb": props.total_memory / MB,
+    }
+
+
+def sha256_file(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as fh:
+        for chunk in iter(lambda: fh.read(4 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest().upper()
+
+
+def get_git_metadata() -> dict[str, object]:
+    def run_git(*args: str) -> str:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return completed.stdout.strip()
+
+    try:
+        status = run_git("status", "--porcelain")
+        return {
+            "commit": run_git("rev-parse", "HEAD"),
+            "branch": run_git("branch", "--show-current"),
+            "dirty": bool(status),
+            "changed_files": status.splitlines(),
+        }
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return {"error": f"{type(exc).__name__}: unable to read git metadata"}
+
+
+def get_model_optimization_status(model) -> dict[str, object]:
+    encoder = getattr(model, "encoder", None)
+    if encoder is None or not hasattr(encoder, "get_optimization_status"):
+        return {"error": "encoder does not expose optimization status"}
+    return encoder.get_optimization_status()
+
+
+def get_model_optimization_issues(model) -> list[str]:
+    encoder = getattr(model, "encoder", None)
+    if encoder is None or not hasattr(encoder, "get_optimization_issues"):
+        return ["encoder does not expose optimization issue reporting"]
+    return encoder.get_optimization_issues()
+
+
+def build_reproducibility_metadata(
+    config: InferenceConfig,
+    args: argparse.Namespace,
+    batch_inputs: dict[int, list[Path]],
+) -> dict[str, object]:
+    ckpt = Path(config.ckpt)
+    checkpoint = {
+        "path": str(ckpt.resolve()),
+        "exists": ckpt.is_file(),
+        "bytes": ckpt.stat().st_size if ckpt.is_file() else None,
+        "sha256": sha256_file(ckpt) if ckpt.is_file() else None,
+    }
+    return {
+        "protocol_version": 2,
+        "git": get_git_metadata(),
+        "checkpoint": checkpoint,
+        "inference_config": asdict(config),
+        "benchmark_args": vars(args),
+        "decode_protocol": {
+            "algorithm": "deterministic_greedy_with_kv_cache",
+            "prompt": args.prompt,
+            "min_new_tokens": args.min_new_tokens,
+            "max_new_tokens": args.max_new_tokens,
+            "eos_masked_before_minimum": True,
+            "per_token_synchronization": bool(args.profile_token_steps),
+            "note": "This fixed benchmark protocol is not the multi-preset production beam/sampling policy.",
+        },
+        "input_policy": "synthetic_repeated" if args.allow_repeated_input else "distinct_videos",
+        "input_batches": {
+            str(batch_size): [
+                {"video_id": path.name, "frames_dir": str(path.resolve())} for path in frame_dirs
+            ]
+            for batch_size, frame_dirs in batch_inputs.items()
+        },
     }
 
 
@@ -349,7 +564,14 @@ def summarize(name: str, samples: list[float], peaks: list[float] | None = None,
     print(line)
 
 
-def build_summary(profiler: BenchmarkProfiler, iteration_rows: list[dict[str, object]], batch_size: int, status: str = "ok") -> dict[str, object]:
+def build_summary(
+    profiler: BenchmarkProfiler,
+    iteration_rows: list[dict[str, object]],
+    batch_size: int,
+    status: str = "ok",
+    optimization_status: dict[str, object] | None = None,
+    optimization_issues: list[str] | None = None,
+) -> dict[str, object]:
     end_to_end = stats_dict(profiler.total_latency_ms)
     throughput = throughput_stats_dict(profiler.throughput_samples)
     latency_mean_ms = end_to_end["mean_ms"]
@@ -381,6 +603,11 @@ def build_summary(profiler: BenchmarkProfiler, iteration_rows: list[dict[str, ob
             **{stage: max(values) if values else None for stage, values in profiler.stage_peak_mem_mb.items()},
         },
         "caption_preview": profiler.last_texts[0] if profiler.last_texts else "",
+        "input_video_ids": list(profiler.last_video_ids),
+        "nonempty_caption_count": sum(bool(text.strip()) for text in profiler.last_texts),
+        "output_validation": "passed" if iteration_rows else "not_run",
+        "optimization_status": optimization_status or {},
+        "optimization_issues": optimization_issues or [],
         "iterations": len(iteration_rows),
     }
 
@@ -396,6 +623,7 @@ def export_iteration_csv(path_str: str, iteration_rows: list[dict[str, object]])
     fieldnames = [
         "iter_index",
         "batch_size",
+        "input_video_ids",
         "iteration_ms",
         "throughput_samples_per_s",
         "caption_preview",
@@ -418,6 +646,8 @@ def export_iteration_csv(path_str: str, iteration_rows: list[dict[str, object]])
         writer.writeheader()
         for index, row in enumerate(iteration_rows, start=1):
             csv_row = {key: row.get(key) for key in fieldnames if key != "iter_index"}
+            if isinstance(csv_row.get("input_video_ids"), list):
+                csv_row["input_video_ids"] = "|".join(csv_row["input_video_ids"])
             writer.writerow({"iter_index": index, **csv_row})
 
 
@@ -467,19 +697,20 @@ def build_config(args: argparse.Namespace) -> InferenceConfig:
         device=args.device,
         backend="torch",
         vit_opt=ViTOptimizeConfig(
-            enable_fp16=backend_config.VIT_ENABLE_FP16,
-            enable_attention_fastpath=backend_config.VIT_ENABLE_ATTENTION_FASTPATH,
-            prefer_channels_last=backend_config.VIT_PREFER_CHANNELS_LAST,
-            enable_torch_compile=backend_config.VIT_ENABLE_TORCH_COMPILE,
-            torch_compile_mode=backend_config.VIT_TORCH_COMPILE_MODE,
-            enable_mlp_bias_gelu_fusion=backend_config.VIT_ENABLE_MLP_BIAS_GELU_FUSION,
-            enable_residual_layernorm_fusion=backend_config.VIT_ENABLE_RESIDUAL_LAYERNORM_FUSION,
-            enable_inplace_residual_add_fusion=backend_config.VIT_ENABLE_INPLACE_RESIDUAL_ADD_FUSION,
-            enable_cupy_fused_pool=backend_config.VIT_ENABLE_CUPY_FUSED_POOL,
-            cupy_pool_force_fp16=backend_config.VIT_CUPY_POOL_FORCE_FP16,
+            enable_fp16=args.vit_fp16,
+            enable_attention_fastpath=args.vit_attention_fastpath,
+            prefer_channels_last=args.vit_channels_last,
+            enable_torch_compile=args.vit_compile,
+            torch_compile_mode=args.vit_compile_mode,
+            enable_mlp_bias_gelu_fusion=args.vit_mlp_gelu_approximation,
+            enable_residual_layernorm_fusion=args.vit_residual_layernorm_fusion,
+            enable_inplace_residual_add_fusion=args.vit_inplace_residual_add,
+            enable_cupy_fused_pool=args.vit_cupy_fused_pool,
+            cupy_pool_force_fp16=args.vit_cupy_pool_force_fp16,
+            enable_cuda_graph=args.vit_cuda_graph,
         ),
-        use_cupy_prefix_projector=backend_config.USE_CUPY_PREFIX_PROJECTOR,
-        cupy_prefix_force_fp16=backend_config.CUPY_PREFIX_FORCE_FP16,
+        use_cupy_prefix_projector=args.cupy_prefix_projector,
+        cupy_prefix_force_fp16=args.cupy_prefix_force_fp16,
     )
 
 
@@ -497,9 +728,22 @@ def default_output_path(path_str: str, default_name: str) -> str:
     return path_str if path_str else default_name
 
 
+def add_boolean_argument(parser: argparse.ArgumentParser, name: str, default: bool, help_text: str):
+    parser.add_argument(
+        name,
+        action=argparse.BooleanOptionalAction,
+        default=default,
+        help=f"{help_text} (default: {default})",
+    )
+
+
 def parse_args():
     parser = argparse.ArgumentParser("Benchmark ViT + GPT-2 video caption inference across batch sizes")
-    parser.add_argument("--frames-dir", required=True, help="Directory that contains frame_*.jpg")
+    parser.add_argument(
+        "--frames-dir",
+        required=True,
+        help="A single video frame directory or a split-level directory containing one directory per video",
+    )
     parser.add_argument("--ckpt", default=str(backend_config.CKPT_PATH), help="Path to caption model checkpoint")
     parser.add_argument("--device", default="cuda", help="CUDA device, e.g. cuda or cuda:0")
     parser.add_argument("--vit-name", default=backend_config.VIT_NAME)
@@ -513,28 +757,135 @@ def parse_args():
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--iters", type=int, default=50)
     parser.add_argument("--max-new-tokens", type=int, default=24)
+    parser.add_argument("--min-new-tokens", type=int, default=8)
+    parser.add_argument(
+        "--profile-token-steps",
+        action="store_true",
+        help="Synchronize and time every generated token; disabled by default because it perturbs end-to-end latency",
+    )
     parser.add_argument("--batch-sizes", default="1", help="Comma-separated batch sizes, e.g. 1,2,4,8,12,16")
+    parser.add_argument(
+        "--allow-repeated-input",
+        action="store_true",
+        help="Allow repeated videos when the requested batch size exceeds available distinct videos; output is labelled synthetic",
+    )
+    parser.add_argument(
+        "--allow-inactive-optimizations",
+        action="store_true",
+        help="Do not fail when a requested optimization is proven inactive; issues remain recorded in JSON",
+    )
+    add_boolean_argument(parser, "--vit-fp16", backend_config.VIT_ENABLE_FP16, "Enable ViT CUDA autocast FP16")
+    add_boolean_argument(
+        parser,
+        "--vit-attention-fastpath",
+        backend_config.VIT_ENABLE_ATTENTION_FASTPATH,
+        "Set timm fused attention/SDPA fastpath explicitly",
+    )
+    add_boolean_argument(
+        parser,
+        "--vit-channels-last",
+        backend_config.VIT_PREFER_CHANNELS_LAST,
+        "Use channels-last input memory format",
+    )
+    add_boolean_argument(parser, "--vit-compile", backend_config.VIT_ENABLE_TORCH_COMPILE, "Enable torch.compile")
+    parser.add_argument("--vit-compile-mode", default=backend_config.VIT_TORCH_COMPILE_MODE)
+    add_boolean_argument(
+        parser,
+        "--vit-mlp-gelu-approximation",
+        backend_config.VIT_ENABLE_MLP_BIAS_GELU_FUSION,
+        "Use tanh GELU approximation (not a guaranteed fused kernel)",
+    )
+    add_boolean_argument(
+        parser,
+        "--vit-residual-layernorm-fusion",
+        backend_config.VIT_ENABLE_RESIDUAL_LAYERNORM_FUSION,
+        "Enable backbone-provided residual/LayerNorm fusion flags when supported",
+    )
+    add_boolean_argument(
+        parser,
+        "--vit-inplace-residual-add",
+        backend_config.VIT_ENABLE_INPLACE_RESIDUAL_ADD_FUSION,
+        "Patch inference blocks to use in-place residual adds",
+    )
+    add_boolean_argument(
+        parser,
+        "--vit-cupy-fused-pool",
+        backend_config.VIT_ENABLE_CUPY_FUSED_POOL,
+        "Enable CuPy fused spatial-temporal pooling",
+    )
+    add_boolean_argument(
+        parser,
+        "--vit-cupy-pool-force-fp16",
+        backend_config.VIT_CUPY_POOL_FORCE_FP16,
+        "Force FP16 inside the CuPy pooling kernel",
+    )
+    add_boolean_argument(parser, "--vit-cuda-graph", backend_config.VIT_ENABLE_CUDA_GRAPH, "Enable ViT CUDA Graph")
+    add_boolean_argument(
+        parser,
+        "--cupy-prefix-projector",
+        backend_config.USE_CUPY_PREFIX_PROJECTOR,
+        "Enable the CuPy prefix projector",
+    )
+    add_boolean_argument(
+        parser,
+        "--cupy-prefix-force-fp16",
+        backend_config.CUPY_PREFIX_FORCE_FP16,
+        "Force FP16 inside the CuPy prefix projector",
+    )
     parser.add_argument("--export-json", default="", help="Summary JSON output path")
     parser.add_argument("--export-csv", default="", help="CSV output path")
     return parser.parse_args()
 
 
-def benchmark_one_batch_size(model, config: InferenceConfig, args: argparse.Namespace, batch_size: int):
+def benchmark_one_batch_size(
+    model,
+    config: InferenceConfig,
+    args: argparse.Namespace,
+    batch_size: int,
+    frame_dirs: list[Path],
+):
     profiler = BenchmarkProfiler(args.device)
     iteration_rows: list[dict[str, object]] = []
 
     print()
     print(f"=== Batch Size {batch_size} ===")
+    print(f"inputs: {[path.name for path in frame_dirs]}")
     print("Warm-up:")
     for index in range(args.warmup):
-        run_one_iteration(model, config, args.frames_dir, args.prompt, args.max_new_tokens, profiler, batch_size)
+        run_one_iteration(
+            model,
+            config,
+            frame_dirs,
+            args.prompt,
+            args.max_new_tokens,
+            args.min_new_tokens,
+            args.profile_token_steps,
+            profiler,
+        )
         print(f"warmup {index + 1}/{args.warmup} done")
+
+    optimization_issues = get_model_optimization_issues(model)
+    if optimization_issues and not args.allow_inactive_optimizations:
+        formatted = "; ".join(optimization_issues)
+        raise RuntimeError(
+            "requested optimizations are inactive; benchmark aborted to prevent an invalid ablation. "
+            f"Disable the unsupported switches explicitly or pass --allow-inactive-optimizations. {formatted}"
+        )
 
     profiler.clear_measurements()
 
     print("Measured Runs:")
     for index in range(args.iters):
-        row = run_one_iteration(model, config, args.frames_dir, args.prompt, args.max_new_tokens, profiler, batch_size)
+        row = run_one_iteration(
+            model,
+            config,
+            frame_dirs,
+            args.prompt,
+            args.max_new_tokens,
+            args.min_new_tokens,
+            args.profile_token_steps,
+            profiler,
+        )
         iteration_rows.append(row)
         print(
             f"iter {index + 1:02d}/{args.iters} bs={batch_size} total={row['iteration_ms']:.3f} ms  "
@@ -542,7 +893,15 @@ def benchmark_one_batch_size(model, config: InferenceConfig, args: argparse.Name
             f"throughput={row['throughput_samples_per_s']:.3f} samples/s"
         )
 
-    return iteration_rows, build_summary(profiler, iteration_rows, batch_size=batch_size)
+    optimization_status = get_model_optimization_status(model)
+    optimization_issues = get_model_optimization_issues(model)
+    return iteration_rows, build_summary(
+        profiler,
+        iteration_rows,
+        batch_size=batch_size,
+        optimization_status=optimization_status,
+        optimization_issues=optimization_issues,
+    )
 
 
 def build_comparison_row(summary: dict[str, object], warmup: int, iters: int) -> dict[str, object]:
@@ -609,12 +968,31 @@ def build_oom_summary(batch_size: int, error: Exception) -> dict[str, object]:
 def main():
     args = parse_args()
     batch_sizes = parse_batch_sizes(args.batch_sizes)
+    if args.warmup < 0 or args.iters <= 0:
+        raise ValueError("warmup must be >= 0 and iters must be > 0")
+    if args.min_new_tokens < 0 or args.min_new_tokens > args.max_new_tokens:
+        raise ValueError("require 0 <= min_new_tokens <= max_new_tokens")
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required for this benchmark baseline.")
 
     assert_core_runtime_ready(device=args.device, require_cupy=False)
     config = build_config(args)
+    batch_inputs = {
+        batch_size: resolve_batch_frame_dirs(
+            args.frames_dir,
+            batch_size,
+            allow_repeated_input=args.allow_repeated_input,
+        )
+        for batch_size in batch_sizes
+    }
     model = load_caption_model(config)
+    initial_optimization_issues = get_model_optimization_issues(model)
+    if initial_optimization_issues and not args.allow_inactive_optimizations:
+        raise RuntimeError(
+            "requested optimizations are known to be inactive before the benchmark starts. "
+            "Disable them explicitly or pass --allow-inactive-optimizations. "
+            + "; ".join(initial_optimization_issues)
+        )
     env = get_env(torch.device(args.device))
 
     print_env(env)
@@ -625,7 +1003,10 @@ def main():
     print(f"batch_sizes: {batch_sizes}")
     print(f"warmup: {args.warmup}")
     print(f"iters: {args.iters}")
+    print(f"min_new_tokens: {args.min_new_tokens}")
     print(f"max_new_tokens: {args.max_new_tokens}")
+    print(f"input_policy: {'synthetic_repeated' if args.allow_repeated_input else 'distinct_videos'}")
+    print(f"requested_vit_optimizations: {asdict(config.vit_opt)}")
     print()
 
     single_batch_mode = len(batch_sizes) == 1
@@ -634,6 +1015,7 @@ def main():
     if not single_batch_mode:
         export_csv = default_output_path(export_csv, "benchmark_bs_comparison.csv")
         export_json = default_output_path(export_json, "benchmark_bs_summary.json")
+    reproducibility = build_reproducibility_metadata(config, args, batch_inputs) if export_json else None
 
     all_iteration_rows: dict[int, list[dict[str, object]]] = {}
     all_summaries: dict[int, dict[str, object]] = {}
@@ -641,7 +1023,13 @@ def main():
 
     for batch_size in batch_sizes:
         try:
-            iteration_rows, summary = benchmark_one_batch_size(model, config, args, batch_size)
+            iteration_rows, summary = benchmark_one_batch_size(
+                model,
+                config,
+                args,
+                batch_size,
+                batch_inputs[batch_size],
+            )
             all_iteration_rows[batch_size] = iteration_rows
             all_summaries[batch_size] = summary
             comparison_rows.append(build_comparison_row(summary, args.warmup, args.iters))
@@ -685,20 +1073,10 @@ def main():
                 export_json,
                 {
                     "env": env,
-                    "config": {
-                        "frames_dir": args.frames_dir,
-                        "ckpt": args.ckpt,
-                        "device": args.device,
-                        "prompt": args.prompt,
-                        "warmup": args.warmup,
-                        "iters": args.iters,
-                        "max_new_tokens": args.max_new_tokens,
-                        "num_frames": args.num_frames,
-                        "image_size": args.image_size,
-                        "prefix_len": args.prefix_len,
-                        "ln_scale": args.ln_scale,
-                        "in_weight": args.in_weight,
-                        "batch_sizes": batch_sizes,
+                    "reproducibility": {
+                        **(reproducibility or {}),
+                        "effective_optimizations": get_model_optimization_status(model),
+                        "optimization_issues": get_model_optimization_issues(model),
                     },
                     "summary": summary,
                     "iterations": iteration_rows,
@@ -715,20 +1093,10 @@ def main():
             export_json,
             {
                 "env": env,
-                "config": {
-                    "frames_dir": args.frames_dir,
-                    "ckpt": args.ckpt,
-                    "device": args.device,
-                    "prompt": args.prompt,
-                    "warmup": args.warmup,
-                    "iters": args.iters,
-                    "max_new_tokens": args.max_new_tokens,
-                    "num_frames": args.num_frames,
-                    "image_size": args.image_size,
-                    "prefix_len": args.prefix_len,
-                    "ln_scale": args.ln_scale,
-                    "in_weight": args.in_weight,
-                    "batch_sizes": batch_sizes,
+                "reproducibility": {
+                    **(reproducibility or {}),
+                    "effective_optimizations": get_model_optimization_status(model),
+                    "optimization_issues": get_model_optimization_issues(model),
                 },
                 "comparison": comparison_rows,
                 "per_batch_summary": {str(bs): summary for bs, summary in all_summaries.items()},

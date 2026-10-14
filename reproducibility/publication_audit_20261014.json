@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-14",
+  "scope": "Publication readiness, source/dependency integrity, numeric arithmetic, selected experiment contracts and local tests",
+  "original_master_rows": 1036,
+  "original_master_sha256": "bf7e56a3b5c52221358fa2abf14cbcad42eb96568f9aaea7be0150fcc646d642",
+  "original_source_dependencies_locally_reverified": 67,
+  "public_numeric_fields": 778,
+  "public_rows_recomputed": 1036,
+  "three_seed_summaries_independently_recomputed": 270,
+  "local_test_run": {
+    "discovered": 113,
+    "passed": 107,
+    "skipped": 6,
+    "failed": 0,
+    "gpu_disabled": true,
+    "scope": "CPU/offline unittest suite; Java-backed scorer exercised"
+  },
+  "skip_reasons": [
+    "local MSVD annotations (2 checks)",
+    "original baseline assets",
+    "original training trace",
+    "original per-seed schedules",
+    "CUDA map-location behavior"
+  ],
+  "publication_scan": "PASS; current tree credential-pattern/personal-path/large-asset and assistant-metadata scan only",
+  "changes": [
+    ".gitignore coverage for .pt, media, caches, env variants and local configs",
+    "Current source snapshot including previously uncommitted formal MSR-VTT, CPR and GIT code",
+    "Numeric evidence extracts and complete row lineage without dataset text or weights",
+    "Synthetic scheduling tests plus explicit asset-dependent integration skips",
+    "MSR-VTT local config materializer with preparation and pinned-weight checks",
+    "No-space METEOR and GIT temporal-key compatibility fixes from completed experiments",
+    "Evidence byte preservation and standard-library CI checks",
+    "Exclude assistant instructions, editor metadata and generated planning/specification artifacts from publication"
+  ],
+  "remaining": [
+    "No full GPU rerun or clean dependency installation in this publication update",
+    "MSVD/efficiency/CPR strict replay still needs unhosted historical assets and path-bearing annotations",
+    "MSR-VTT preparation still reads the historical model-source preflight",
+    "Archived staged adapters require original frozen config/run layout",
+    "No history-wide credential audit or project-wide license added"
+  ],
+  "claims": [
+    "Same-set test2990 is not standard 1K retrieval",
+    "Sample SD is not a confidence interval or significance result",
+    "GIT is an external caption reference, not a controlled causal or speed comparison",
+    "CPR remains negative; qualitative review remains AI-assisted"
+  ],
+  "clean_clone_verification": {
+    "checked_commit": "762c2a8e404d9fc3acbc5f94c45787c2768067a2",
+    "site_packages_disabled": true,
+    "public_evidence": "PASS",
+    "publication_scan": "PASS (288 files)",
+    "standard_library_tests_passed": 7,
+    "syntax_compile": "PASS",
+    "code_provenance_hashes": "270/270 match"
+  },
+  "assistant_metadata_revision": {
+    "removed_from_release_tree": true,
+    "ignore_rules_verified": true,
+    "tracked_metadata_regression_tests_passed": 3,
+    "full_suite": "113 discovered; 107 passed; 6 skipped; 0 failed"
+  }
+}

@@ -28,8 +28,13 @@ def load_video_tensor(frames_dir: str | Path, num_frames: int, image_size: int, 
     if not files:
         raise FileNotFoundError(f"No frame_*.jpg files found under {frames_dir}")
 
-    step = max(len(files) // num_frames, 1)
-    picks = files[::step][:num_frames]
+    if len(files) >= num_frames:
+        positions = torch.linspace(0, len(files) - 1, steps=num_frames)
+        indices = [int(round(position.item())) for position in positions]
+    else:
+        repeats = (num_frames + len(files) - 1) // len(files)
+        indices = (list(range(len(files))) * repeats)[:num_frames]
+    picks = [files[index] for index in indices]
 
     transform = transforms.Compose(
         [
@@ -47,4 +52,3 @@ def load_video_tensor(frames_dir: str | Path, num_frames: int, image_size: int, 
     video = torch.stack(imgs, dim=0).unsqueeze(0).to(device)
     log.info("frames_dir=%s total=%s sampled=%s", frames_dir, len(files), len(picks))
     return video
-

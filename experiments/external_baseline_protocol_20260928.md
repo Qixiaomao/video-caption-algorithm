@@ -1,0 +1,22 @@
+# One external captioning baseline: GIT-base-VATEX (registered 2026-09-28)
+
+**Status:** candidate model and weights pinned; no GPU smoke, test prediction, metric or resource comparison has run. This registration precedes the MSR-VTT formal results. At most this one external method will enter the formal comparison. The MSR-VTT A/B six-arm package remains the first priority.
+
+## Identity and permitted comparison
+
+The candidate is Microsoft's GIT-base checkpoint fine-tuned on VATEX, `microsoft/git-base-vatex`, Hugging Face revision `623363cef8744c57438ce8d62b30bef1fbbec111`. The [official model page](https://huggingface.co/microsoft/git-base-vatex) states MIT license, about 0.2B parameters, GIT-base pretraining on 10 million image-text pairs, and VATEX fine-tuning. The [official research code](https://github.com/microsoft/GenerativeImage2Text) supports multiple-frame caption input. Local files and SHA-256 values are in `runs/external_baseline_git_vatex_20260928/model_download.json`; `model.safetensors` is 706,545,064 B, SHA-256 `04ea5c7d586ada3d9fb626eec35fef084c45d6f8b817469fb520ab9cbcca44ca`.
+
+The main comparison target is the **same frozen 670-video MSVD test set and references** used for this project's existing MSVD results. This model can only provide a captioning comparison; no retrieval output will be invented. Its VATEX training, architecture, input convention and tokenizer differ from our ViT+GPT-2. Any result is an external quality/deployment reference, not an A/B causal comparison or proof of a component advantage. We will disclose unverified overlap between its large-scale pretraining data and MSVD if the original sources do not resolve it. No paper number substitutes for local predictions.
+
+## Frozen local input and output policy
+
+- Read `data/processed/msvd_full/test/annotations.json`, SHA-256 `9a1fb940f1b9513a882e7ead5620397b0bf39ad1237b9c8ccb57ce765de50b1f`, matching `runs/test670_evaluation_20260908/preflight.json`, and its exact 670 IDs in existing test order. Refuse dropped or missing records; verify each source directory has the expected eight prepared JPEG frames and retain the dataset hash in the run manifest. The preliminary file-only check `runs/external_baseline_git_vatex_20260928/msvd_test_frame_coverage.json` found 670/670 eight-frame directories and no missing set; it generated no predictions or metrics.
+- Select six of those eight frames at zero-based positions **[0, 1, 3, 4, 6, 7]**, a deterministic uniform subsample. The source eight frames were prepared under the MSVD protocol; this is a six-frame GIT deployment adaptation, not the paper's original image pipeline.
+- Use the checkpoint's local `GitProcessor` with `use_fast=False`, passing the six-frame list as `images=`; a CPU-only MSVD val preprocessing probe returned `pixel_values` shape `[1,6,3,224,224]`. Its configuration specifies shortest-edge resize 224, center crop 224, rescale 1/255 and RGB normalization mean/std 0.5. Preserve its BERT tokenizer and special tokens. The local `preprocessor_config.json` and processor class are authoritative if a generic model-card sentence differs.
+- Decode greedily with `max_new_tokens=24`, `min_new_tokens=0`, `num_beams=1`, `do_sample=False`, `no_repeat_ngram_size=3`, `repetition_penalty=1.0`, and model/tokenizer EOS. No prompt, caption reranking or test-tuned settings. Freeze this before test use.
+- Save one prediction per all 670 video IDs and score with the *same local* `scripts/caption_metrics.py` and reference set as existing MSVD test results. Record raw values and the display ×100 convention. Preserve empty predictions and failure logs; do not silently drop them.
+- First run a limited MSVD **val** engineering smoke and memory/time probe after the MSR-VTT formal GPU training is launched or complete. Run full test inference only if the smoke is executable on the 4 GB card. No concurrent GPU baseline run while MSR-VTT training, validation or test is using the card. If the local adaptation cannot run, mark the baseline blocked or failed; a literature number or OOM is not a completed baseline.
+
+## Remaining evidence
+
+Validate six-frame coverage, script and library hashes, and produce a smoke result before running formal predictions under the new baseline directory. Record GPU peak memory and a clearly bounded runtime measurement separately from existing E0–E4 timings, because the model and frame processor differ. No human evaluation is part of this baseline.

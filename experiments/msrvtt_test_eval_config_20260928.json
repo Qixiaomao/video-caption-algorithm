@@ -1,0 +1,49 @@
+{
+  "status": "FROZEN_BEFORE_FORMAL_TRAINING",
+  "frozen_at_utc": "2026-09-28T10:44:54Z",
+  "protocol": "msrvtt-captioning-test2990-and-matched-retrieval-v1",
+  "dataset": "MSR-VTT v1.0",
+  "source_annotation_sha256": "c6cb51bb725b76e78255f87c5fbb96886957ac53503a39bb03bff40b419cf996",
+  "test_split_list_sha256": "e033df45731e025a1b7b4731ee3eddc400b6040c93fffd4ab3eb45a551f0526e",
+  "test_video_count": 2990,
+  "test_caption_count": 59794,
+  "model_selection": "All A/B seed endpoints are fixed by the frozen training config. Test is run once after validation_freeze.json exists; test scores never choose a seed, checkpoint, loss weight or decode setting.",
+  "caption_generation": {
+    "prompt": "",
+    "num_beams": 1,
+    "do_sample": false,
+    "max_new_tokens": 24,
+    "min_new_tokens": 0,
+    "temperature": 1.0,
+    "top_p": 0.9,
+    "no_repeat_ngram_size": 3,
+    "repetition_penalty": 1.0,
+    "pad_token_id": 50256,
+    "eos_token_id": 50256,
+    "one_prediction_per_video": true
+  },
+  "caption_metrics": {
+    "package": "pycocoevalcap==1.2",
+    "metrics": ["BLEU-1", "BLEU-2", "BLEU-3", "BLEU-4", "METEOR", "ROUGE-L", "CIDEr"],
+    "reference_policy": "all original captions for each of the 2990 test videos",
+    "store_raw_scores": true,
+    "display_scale": 100
+  },
+  "retrieval": {
+    "name": "captioning-test2990 matched retrieval, not MSR-VTT 1K retrieval",
+    "candidate_videos": 2990,
+    "caption_queries": 59794,
+    "text_to_video_target": "originating video ID for each original caption",
+    "video_to_text_positive": "any original caption of the query video",
+    "video_representation": "L2-normalized mean visual prefix token",
+    "text_representation": "L2-normalized masked mean of frozen GPT-2 token embeddings",
+    "text_tokenizer_max_length": 128,
+    "text_truncation_rule": "fail if any original query needs 128 or more GPT-2 tokens; no silent truncation",
+    "ranking": "cosine similarity, descending; deterministic ID-order tie rule",
+    "metrics": ["T2V R@1", "T2V R@5", "T2V R@10", "V2T R@1", "V2T R@5", "V2T R@10"],
+    "units": "percent",
+    "exact_caption_collision_policy": "retain originating-video target; disclose ambiguous repeated strings"
+  },
+  "test_feature_policy": "Build test frozen ViT features only after validation_freeze.json; verify direct/cache equality without reading model quality metrics during setup.",
+  "failure_policy": "Preserve predictions, logs and original failure; rerun only for a documented implementation error with unchanged training/config and disclose the correction."
+}

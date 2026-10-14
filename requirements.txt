@@ -83,6 +83,8 @@ matplotlib==3.8.0
 pandas==2.2.3
 scikit-learn==1.5.2
 nltk==3.9.1
+pycocoevalcap==1.2
+pycocotools==2.0.11
 
 # -----------------------------
 # Optional retrieval/index tools

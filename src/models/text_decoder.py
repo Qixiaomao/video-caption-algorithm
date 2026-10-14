@@ -57,7 +57,12 @@ class GPT2TextDecoder(nn.Module):
         else:
             raise ValueError("cond_mode must be 'prefix' or 'bos'")
 
-    def _build_inputs(self, video_emb: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+    def _build_inputs(
+        self,
+        video_emb: torch.Tensor,
+        input_ids: torch.Tensor,
+        visual_prefix: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         # INFO(core-ops): visual-text fusion happens here before GPT-2 decode.
         batch = video_emb.size(0)
         hidden = self.model.config.n_embd
@@ -65,13 +70,24 @@ class GPT2TextDecoder(nn.Module):
         if base_embeds.size(0) == 1 and batch > 1:
             base_embeds = base_embeds.expand(batch, -1, -1)
 
+        if visual_prefix is None:
+            visual_prefix = self.build_visual_prefix(video_emb)
+        expected_prefix = self.prefix_len if self.cond_mode == "prefix" else 1
+        expected_shape = (batch, expected_prefix, hidden)
+        if tuple(visual_prefix.shape) != expected_shape:
+            raise ValueError(
+                f"visual_prefix must have shape {expected_shape}, got {tuple(visual_prefix.shape)}"
+            )
+        return torch.cat([visual_prefix, base_embeds], dim=1)
+
+    def build_visual_prefix(self, video_emb: torch.Tensor) -> torch.Tensor:
+        """Map video features to the exact prefix used during training."""
+
+        batch = video_emb.size(0)
+        hidden = self.model.config.n_embd
         if self.cond_mode == "prefix":
-            mapped = self.mapper(video_emb).view(batch, self.prefix_len, hidden)  # [B,P,H]
-            inputs_embeds = torch.cat([mapped, base_embeds], dim=1)  # [B,P+L,H]
-        else:
-            bos_embed = self.mapper(video_emb).unsqueeze(1)  # [B,1,H]
-            inputs_embeds = torch.cat([bos_embed, base_embeds], dim=1)  # [B,1+L,H]
-        return inputs_embeds
+            return self.mapper(video_emb).view(batch, self.prefix_len, hidden)
+        return self.mapper(video_emb).unsqueeze(1)
 
     def forward(
         self,
@@ -79,6 +95,7 @@ class GPT2TextDecoder(nn.Module):
         input_ids: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         labels: Optional[torch.Tensor] = None,
+        visual_prefix: Optional[torch.Tensor] = None,
     ):
         batch = video_emb.size(0)
 
@@ -89,7 +106,7 @@ class GPT2TextDecoder(nn.Module):
         extra_mask = torch.ones(batch, extra, dtype=attention_mask.dtype, device=attention_mask.device)
         attn = torch.cat([extra_mask, attention_mask], dim=1)
 
-        inputs_embeds = self._build_inputs(video_emb, input_ids)
+        inputs_embeds = self._build_inputs(video_emb, input_ids, visual_prefix=visual_prefix)
 
         loss = None
         if labels is not None:
@@ -116,12 +133,13 @@ class GPT2TextDecoder(nn.Module):
         min_new_tokens: int = 8,
     ) -> List[str]:
         device = video_emb.device
+        inputs_embeds = self.build_visual_prefix(video_emb)
         if prompt:
             input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-        else:
-            input_ids = torch.tensor([[self.tokenizer.bos_token_id]], device=device)
-
-        inputs_embeds = self._build_inputs(video_emb, input_ids)
+            prompt_embeds = self.model.transformer.wte(input_ids)
+            if prompt_embeds.size(0) == 1 and video_emb.size(0) > 1:
+                prompt_embeds = prompt_embeds.expand(video_emb.size(0), -1, -1)
+            inputs_embeds = torch.cat([inputs_embeds, prompt_embeds], dim=1)
         attention_mask = torch.ones(
             inputs_embeds.shape[:2],
             dtype=torch.long,

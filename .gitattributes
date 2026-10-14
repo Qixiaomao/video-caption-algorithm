@@ -1,0 +1,3 @@
+# Public manifests hash file bytes. Preserve evidence across Windows/Linux clones.
+* text=auto eol=lf
+reproducibility/evidence/* -text

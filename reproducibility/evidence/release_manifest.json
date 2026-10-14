@@ -1,0 +1,10 @@
+{
+  "rows": 1036,
+  "original_master_sha256": "bf7e56a3b5c52221358fa2abf14cbcad42eb96568f9aaea7be0150fcc646d642",
+  "files": {
+    "paper_master_results.csv": "deb1f168d9f60d580887ae02b2e8c6383662034a5a776ba0e6938c6d9fa03e5a",
+    "row_lineage.json": "a0cc53d5cadc2b7a4f6b1361dd9f1afe9f7eaac486a84b5da164359eda229383",
+    "source_manifest.json": "7521d0862aa3d7bee0d471c1cdc3cdc952248e007de3fadce6a0628c7b703496",
+    "source_values.json": "e7f23ac998d07e162e0e65ccae73eddef8ba756fe5e6263c426ebf665caeebba"
+  }
+}
