@@ -1,0 +1,66 @@
+{
+  "protocol": "formal-efficiency-matrix-v1",
+  "seed": 123,
+  "blocks": [
+    {
+      "block": 1,
+      "configuration_order": [
+        "E3",
+        "E1",
+        "E4",
+        "E2",
+        "E0"
+      ]
+    },
+    {
+      "block": 2,
+      "configuration_order": [
+        "E4",
+        "E1",
+        "E3",
+        "E0",
+        "E2"
+      ]
+    },
+    {
+      "block": 3,
+      "configuration_order": [
+        "E3",
+        "E0",
+        "E1",
+        "E2",
+        "E4"
+      ]
+    }
+  ],
+  "batch_order": [
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "primary_batch_sizes": [
+    1,
+    2,
+    4,
+    8
+  ],
+  "boundary_batch_size": 16,
+  "warmup_iterations_per_cell": 10,
+  "measured_iterations_per_cell": 50,
+  "metric_definitions": {
+    "preprocess_host_ms": "JPEG load, resize, ToTensor, normalization, and CPU concatenation",
+    "preprocess_cuda_ms": "synchronized CPU-to-CUDA tensor transfer",
+    "vit_encoder_ms": "synchronized CUDA-event ViT encoder latency",
+    "prefix_alignment_ms": "synchronized CUDA-event projection and visual-prefix mapping latency",
+    "gpt2_decoder_ms": "synchronized CUDA-event Hugging Face greedy generate latency",
+    "end_to_end_ms": "host wall time from preprocessing start through synchronized decode completion",
+    "samples_per_second": "batch_size / end_to_end_seconds",
+    "generated_tokens_total": "sum of generated sequence lengths through first EOS, including EOS",
+    "decoder_ms_per_step": "gpt2_decoder_ms / maximum generated sequence length in the batch",
+    "decoder_ms_per_output_token": "gpt2_decoder_ms / generated_tokens_total",
+    "peak_allocated_mib": "torch CUDA maximum allocated memory after per-iteration peak reset",
+    "peak_reserved_mib": "torch CUDA maximum reserved memory after per-iteration peak reset"
+  }
+}

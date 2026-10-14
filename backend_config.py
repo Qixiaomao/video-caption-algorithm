@@ -1,4 +1,4 @@
-﻿# backend_config.py
+# backend_config.py
 from pathlib import Path
 import importlib.util
 import os
@@ -39,8 +39,10 @@ DEVICE = os.getenv("VIDEO_CAPTION_DEVICE", _default_device())
 PREFIX_LEN = 4
 NUM_FRAMES = 8
 IMAGE_SIZE = 224
-LN_SCALE = 0.6
-IN_WEIGHT = 0.4
+# Keep inference aligned with mapper training. Legacy benchmark scaling remains
+# available through CLI flags for controlled ablations only.
+LN_SCALE = 0.0
+IN_WEIGHT = 0.0
 
 # ViT optimization switches.
 VIT_ENABLE_FP16 = _env_bool("VIDEO_CAPTION_VIT_FP16", True)
@@ -53,6 +55,7 @@ VIT_ENABLE_RESIDUAL_LAYERNORM_FUSION = _env_bool("VIDEO_CAPTION_VIT_RESIDUAL_LN_
 VIT_ENABLE_INPLACE_RESIDUAL_ADD_FUSION = _env_bool("VIDEO_CAPTION_VIT_INPLACE_RESIDUAL_ADD_FUSION", True)
 VIT_ENABLE_CUPY_FUSED_POOL = _env_bool("VIDEO_CAPTION_VIT_CUPY_FUSED_POOL", False)
 VIT_CUPY_POOL_FORCE_FP16 = _env_bool("VIDEO_CAPTION_VIT_CUPY_POOL_FORCE_FP16", True)
+VIT_ENABLE_CUDA_GRAPH = _env_bool("VIDEO_CAPTION_VIT_CUDA_GRAPH", False)
 
 # Cross-modal projection operator switches.
 USE_CUPY_PREFIX_PROJECTOR = _env_bool("VIDEO_CAPTION_USE_CUPY_PREFIX_PROJECTOR", False)

@@ -35,8 +35,10 @@ class InferRequest(BaseModel):
     vit_torch_compile_mode: str = Field(default=_DEFAULT.vit_opt.torch_compile_mode)
     vit_enable_mlp_bias_gelu_fusion: bool = Field(default=_DEFAULT.vit_opt.enable_mlp_bias_gelu_fusion)
     vit_enable_residual_layernorm_fusion: bool = Field(default=_DEFAULT.vit_opt.enable_residual_layernorm_fusion)
+    vit_enable_inplace_residual_add_fusion: bool = Field(default=_DEFAULT.vit_opt.enable_inplace_residual_add_fusion)
     vit_enable_cupy_fused_pool: bool = Field(default=_DEFAULT.vit_opt.enable_cupy_fused_pool)
     vit_cupy_pool_force_fp16: bool = Field(default=_DEFAULT.vit_opt.cupy_pool_force_fp16)
+    vit_enable_cuda_graph: bool = Field(default=_DEFAULT.vit_opt.enable_cuda_graph)
     use_cupy_prefix_projector: bool = Field(default=_DEFAULT.use_cupy_prefix_projector)
     cupy_prefix_force_fp16: bool = Field(default=_DEFAULT.cupy_prefix_force_fp16)
 

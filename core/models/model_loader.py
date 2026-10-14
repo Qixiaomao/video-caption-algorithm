@@ -66,6 +66,7 @@ def load_torch_caption_model(config: InferenceConfig):
         vit_enable_inplace_residual_add_fusion=config.vit_opt.enable_inplace_residual_add_fusion,
         vit_enable_cupy_fused_pool=config.vit_opt.enable_cupy_fused_pool,
         vit_cupy_pool_force_fp16=config.vit_opt.cupy_pool_force_fp16,
+        vit_enable_cuda_graph=config.vit_opt.enable_cuda_graph,
         use_cupy_prefix_projector=config.use_cupy_prefix_projector,
         cupy_prefix_force_fp16=config.cupy_prefix_force_fp16,
     ).to(config.device).eval()

@@ -17,6 +17,7 @@ from core.config import InferenceConfig, ViTOptimizeConfig
 from core.env import assert_core_runtime_ready
 from core.models.model_loader import load_caption_model
 from core.preprocessing.frame_loader import load_video_tensor
+from core.scripts.benchmark_baseline import select_greedy_token, validate_decoder_outputs
 
 MB = 1024.0 * 1024.0
 
@@ -47,6 +48,7 @@ def run_one_profile(
     frames_dir: str,
     prompt: str,
     max_new_tokens: int,
+    min_new_tokens: int,
     use_autocast_fp16: bool,
 ):
     profile_device = torch.device(config.device)
@@ -114,7 +116,12 @@ def run_one_profile(
                         )
 
                 logits = outputs.logits[:, -1, :]
-                next_token = torch.argmax(logits, dim=-1)
+                next_token = select_greedy_token(
+                    logits,
+                    tokenizer.eos_token_id,
+                    step_idx,
+                    min_new_tokens,
+                )
                 token_id = int(next_token.item())
                 generated_tokens.append(token_id)
                 past_key_values = outputs.past_key_values
@@ -133,6 +140,7 @@ def run_one_profile(
                 )
 
     text = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
+    validate_decoder_outputs([text], [len(generated_tokens)], min_new_tokens)
     return {"caption": text, "generated_tokens": len(generated_tokens)}
 
 
@@ -170,6 +178,7 @@ def build_config(args: argparse.Namespace) -> InferenceConfig:
             enable_inplace_residual_add_fusion=backend_config.VIT_ENABLE_INPLACE_RESIDUAL_ADD_FUSION,
             enable_cupy_fused_pool=backend_config.VIT_ENABLE_CUPY_FUSED_POOL,
             cupy_pool_force_fp16=backend_config.VIT_CUPY_POOL_FORCE_FP16,
+            enable_cuda_graph=backend_config.VIT_ENABLE_CUDA_GRAPH,
         ),
         use_cupy_prefix_projector=backend_config.USE_CUPY_PREFIX_PROJECTOR,
         cupy_prefix_force_fp16=backend_config.CUPY_PREFIX_FORCE_FP16,
@@ -190,6 +199,7 @@ def parse_args():
     parser.add_argument("--in-weight", type=float, default=backend_config.IN_WEIGHT)
     parser.add_argument("--prompt", default=backend_config.PROMPT3)
     parser.add_argument("--max-new-tokens", type=int, default=24)
+    parser.add_argument("--min-new-tokens", type=int, default=8)
     parser.add_argument("--warmup", type=int, default=3)
     parser.add_argument("--use-autocast-fp16", action="store_true", help="Enable CUDA autocast(fp16) during the profiled run")
     parser.add_argument("--export-json", default="", help="Optional JSON output path for single-run metadata")
@@ -219,12 +229,28 @@ def main():
     print()
 
     for _ in range(args.warmup):
-        _ = run_one_profile(model, config, args.frames_dir, args.prompt, args.max_new_tokens, args.use_autocast_fp16)
+        _ = run_one_profile(
+            model,
+            config,
+            args.frames_dir,
+            args.prompt,
+            args.max_new_tokens,
+            args.min_new_tokens,
+            args.use_autocast_fp16,
+        )
         torch.cuda.synchronize(device)
 
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats(device)
-    result = run_one_profile(model, config, args.frames_dir, args.prompt, args.max_new_tokens, args.use_autocast_fp16)
+    result = run_one_profile(
+        model,
+        config,
+        args.frames_dir,
+        args.prompt,
+        args.max_new_tokens,
+        args.min_new_tokens,
+        args.use_autocast_fp16,
+    )
     torch.cuda.synchronize(device)
     peak_memory_mb = torch.cuda.max_memory_allocated(device) / MB
 
@@ -246,6 +272,7 @@ def main():
                         "prompt": args.prompt,
                         "warmup": args.warmup,
                         "max_new_tokens": args.max_new_tokens,
+                        "min_new_tokens": args.min_new_tokens,
                         "precision": "fp16_autocast" if args.use_autocast_fp16 else "fp32",
                         "num_frames": args.num_frames,
                         "image_size": args.image_size,

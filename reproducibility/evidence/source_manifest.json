@@ -1,0 +1,418 @@
+{
+  "original_master_sha256": "bf7e56a3b5c52221358fa2abf14cbcad42eb96568f9aaea7be0150fcc646d642",
+  "original_audit_date": "2026-10-03",
+  "local_reverification_date": "2026-10-14",
+  "source_files_verified": [
+    {
+      "source": "${CODE_ROOT}/runs/test670_evaluation_20260908/completion.json",
+      "original_sha256": "38de00fce85625e8b3b0c96d6b2cfb3b3ef9889f691622b3d3d0b0fac1b978ef",
+      "bytes": 11528,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/full_msvd_balanced_20260905/result.json",
+      "original_sha256": "80063ad11a750741735124b3f4bc4a81555a6f8eb9c612d89bee821279c7051f",
+      "bytes": 1824308,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/full_msvd_infonce_ablation_20260906/result.json",
+      "original_sha256": "4a28f87ee21436dd6fb12fc068c14d57ac8cee9adc5d75dadcfd0e4b2784a587",
+      "bytes": 1655696,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/repeated_seeds_20260908/seed124/A/result.json",
+      "original_sha256": "a94a1e22e4884552daf1bb1404b4eaf9eef4860c8e60c7b6f5372cef4e0befdc",
+      "bytes": 1686752,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/repeated_seeds_20260908/seed124/B/result.json",
+      "original_sha256": "b57e76ea10bd28d5dd2d059a55003a329f37dbc526914089288a8cb089cb582c",
+      "bytes": 1688275,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/repeated_seeds_20260908/seed125/A/result.json",
+      "original_sha256": "41ead69eba750d233210ff6df0e2df2a474a3bffe09e73b448ef5fd348278f46",
+      "bytes": 1690356,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/repeated_seeds_20260908/seed125/B/result.json",
+      "original_sha256": "ebc566e5bc94d63a3f3f283281c6be3da1300e253630f2eb20c8d6c50bcbd70e",
+      "bytes": 1689449,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/formal_efficiency_matrix_20260909/result.json",
+      "original_sha256": "745ac386ec8c5b769df6fca6baa64de2a1a427d7c05aad787c2e6239d20edaa5",
+      "bytes": 554498,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/formal_efficiency_uncertainty_20260912/result.json",
+      "original_sha256": "f9436c0d27a06125bf4562f1764dd67ff01ffe8b3ac3e18cfc46c82e7ed2711d",
+      "bytes": 111265,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/q3_cpr_cd_resumed_formal_20260925/completion.json",
+      "original_sha256": "6d29b2eb8226ae1af7b8022e8c997e5f46f9704bc992d4a94eb949df5dd4dfbd",
+      "bytes": 6251,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/completion.json",
+      "original_sha256": "7092b9cd9be448cc79dda7bbe0841298e16b227f9a52e2e737843ae47c1faf9d",
+      "bytes": 11020,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/validation_freeze.json",
+      "original_sha256": "ca35a4ddf040c4884506b3cb2bf1193d327dac2c03e38abaa8dd629a0629fe3a",
+      "bytes": 1935,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/completion.json",
+      "original_sha256": "80789456be45feac43f82d53896a88a2d4abae034a7f7058bd8e26afff917a45",
+      "bytes": 370,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/preflight.json",
+      "original_sha256": "1c1ebc65019af51796f709817fa194cc7c1ec8c7917d082f0081253ac75e0223",
+      "bytes": 4241,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/experiments/msrvtt_ab_formal_config_20260928.json",
+      "original_sha256": "75fbdd3131fc9177d0fcb828f4a0f6be65e6e884c3249434813b39d4e7f9ec38",
+      "bytes": 3086,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/staged_msrvtt_test2990.py",
+      "original_sha256": "3a3468501b00ee4764de5a79572bc529e58b94cb4c04698d342d203d325aa9d9",
+      "bytes": 20047,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/scripts/run_msrvtt_test2990_20260929.py",
+      "original_sha256": "c09190bfcee38b566551c4f307596310e91f4bc9d4e6375a207ad92fea44535e",
+      "bytes": 20250,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/scripts/msrvtt_blockwise_retrieval.py",
+      "original_sha256": "7a94d58c02aae5823550c29b4b8bc63f850df67e27235132fe9b86765f46eaa6",
+      "bytes": 6669,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/scripts/caption_metrics.py",
+      "original_sha256": "2e0f453781cd597f86ea7ea685708d9db0154fd0ebefe7bf76b5f41aa84e74a4",
+      "bytes": 7468,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/scripts/eval_retrieval.py",
+      "original_sha256": "1962bed06865cf6093285bf46d339ca36e923ab6ecabc73e7ebde1eae88cbfa9",
+      "bytes": 11805,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/src/models/caption_model.py",
+      "original_sha256": "ad9e1edc41c8afa99988c20220de5fda1a1295c0aa513bb7a77810b8f16d2b59",
+      "bytes": 5123,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/src/models/text_decoder.py",
+      "original_sha256": "47e901ba8b0630a7afedc5ffbe1299fcfdab281233a2cb8979750a047c637929",
+      "bytes": 6475,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/experiments/msrvtt_test_eval_config_20260928.json",
+      "original_sha256": "ec2edd8239db2711ad85698da757af43c4ebf6625d6edf22e0d055bbd8682d28",
+      "bytes": 2563,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/test_annotations.json",
+      "original_sha256": "548c663e490d82a5468c82af1587006ab7a094cfdb17ed3e33c74a7d42ddb52c",
+      "bytes": 4651790,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/result_seed123_A.json",
+      "original_sha256": "315c61daf58ee80b38c284c20d605f693376b710fb96cfa216b8c4c305531d17",
+      "bytes": 2786180,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed123/A/checkpoint_epoch030.pt",
+      "original_sha256": "fb7ed058e5a77fae239ce0b38e95f25151cbc960c798c01e777dafa157c4d0ff",
+      "bytes": 852962234,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/predictions_seed123_A.json",
+      "original_sha256": "b13a17891faa2117190395d0df3584610bae892013594b1ae0a4223557680938",
+      "bytes": 270984,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/result_seed123_B.json",
+      "original_sha256": "49c1342d77c45024170496db792b1a2f06ff5adaeaf1c38ac9ef9eb809af4dc9",
+      "bytes": 2749904,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed123/B/checkpoint_epoch030.pt",
+      "original_sha256": "d99e5fb0dd6c5f5d444e09fbab6708d1ef7df5fbb22504eb27e2cf3c56442a30",
+      "bytes": 852962234,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/predictions_seed123_B.json",
+      "original_sha256": "138830c4e4fdd4aad24ae76af30286d9fe5e6d213e0b0e246079baeceea8a8e7",
+      "bytes": 268594,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/result_seed124_A.json",
+      "original_sha256": "58ec6cab857cce2c0eb8ab3234ddf0749acef9d2486ad8961d9449e9b85f7d09",
+      "bytes": 2782526,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed124/A/checkpoint_epoch030.pt",
+      "original_sha256": "4a95291d09b02e0d5a6360fd47c0cd92413c5bf4a20733bab67b23555ba2c10d",
+      "bytes": 852962234,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/predictions_seed124_A.json",
+      "original_sha256": "2f5ccdec75d79d4aaddf46e62d39434fbead1bdf6e29b0b5deed6affd97ae459",
+      "bytes": 268911,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/result_seed124_B.json",
+      "original_sha256": "05fe9055bc4bc00d8bd97f32f60dbc963061507b98c7d9999c03407fd22e7b00",
+      "bytes": 2749634,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed124/B/checkpoint_epoch030.pt",
+      "original_sha256": "4c1f971393f1f8672ecffa09a03c56cb841ad3ef0bd0b6aadf4e100e14ff0c3e",
+      "bytes": 852962234,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/predictions_seed124_B.json",
+      "original_sha256": "c698af2c4a8c6a00ea1c9e3c30f2d9cf0bc2a05a3b49162210da71b6cf9ac07f",
+      "bytes": 268293,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/result_seed125_A.json",
+      "original_sha256": "21b6c63c21a45d16c5ef0a859ba45c929e138f8a190f2f048832239f2cd5f8c4",
+      "bytes": 2784222,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed125/A/checkpoint_epoch030.pt",
+      "original_sha256": "582d05eec3fbbd9da3cddd5c6502466ece306f7e275e781bb7c4f03e5ca08dbb",
+      "bytes": 852962234,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/predictions_seed125_A.json",
+      "original_sha256": "f81e8982e7a147a893b5af50f3dfa95728ab05408d95e3d218b0e34de83b32c6",
+      "bytes": 270233,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/result_seed125_B.json",
+      "original_sha256": "47f8239e744110a6cf326ff0107deea65ad6da44b328359f58438e44e9dc395b",
+      "bytes": 2750135,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed125/B/checkpoint_epoch030.pt",
+      "original_sha256": "68e7a40037cab676b12d9add3b0637f5358deacf442bb669e8430283aebcb663",
+      "bytes": 852962234,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_test2990_staged_20261002/predictions_seed125_B.json",
+      "original_sha256": "007e56336b3a9b9621f9e1e022fe9500f2628e8dec4bca11ec80dc7f86c42103",
+      "bytes": 271357,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed123/A/evaluation_epoch030.json",
+      "original_sha256": "9e173bf7e6fb99e42acfa843915657434639bc5565cfd6b75e3f8e8b78259397",
+      "bytes": 1106425,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed123/B/evaluation_epoch030.json",
+      "original_sha256": "4715ad33564a07c880a2927aaf1cf6265e7cc84a4672625a7036f385f45676a2",
+      "bytes": 1102560,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed124/A/evaluation_epoch030.json",
+      "original_sha256": "c76570ebb48e19af459117f6567ad7dc1161dbfd6661db024f062d4f9e1e9023",
+      "bytes": 1107834,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed124/B/evaluation_epoch030.json",
+      "original_sha256": "9d5e1b67e96fbe9e5adc82b1cdcb84588a760c3344cde82d74733f68b9aa4063",
+      "bytes": 1106683,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed125/A/evaluation_epoch030.json",
+      "original_sha256": "6c4687de926f4fd71efc079135fedc4036613802c8262e0d4768239c0f1fb427",
+      "bytes": 1109257,
+      "redistributed": false
+    },
+    {
+      "source": "${PAPER_ROOT}/paper_revision/msrvtt_runs/msrvtt_staged_125B/seed125/B/evaluation_epoch030.json",
+      "original_sha256": "b70a6d8775133813df2b2d4338fe0655ed128b21c0e014c7adaf40e6688ddcb7",
+      "bytes": 1111816,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/formal_test670_compat_20261003/result.json",
+      "original_sha256": "7c3341b10819bae2887817b8620ec685bc653057fcf33c9d19cf73e026bc6cc6",
+      "bytes": 1854,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/formal_test670_compat_20261003/predictions.json",
+      "original_sha256": "28341ee6eb7feb823f24dc97908a2fcbcc78c2651fea52fb6960820fcb1891d3",
+      "bytes": 85128,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/formal_test670_compat_20261003/caption_metrics.json",
+      "original_sha256": "fd54409f809867108636d5771224e0f2f9b97f31dae9a79b828f245a10c2abc3",
+      "bytes": 212420,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/formal_test670_compat_20261003/per_video_timing.json",
+      "original_sha256": "7ae1573569a152b0a21f5ae19ff1f67bdb70684630dd04c8ee9daad345843ffd",
+      "bytes": 68482,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/data/processed/msvd_full/test/annotations.json",
+      "original_sha256": "9a1fb940f1b9513a882e7ead5620397b0bf39ad1237b9c8ccb57ce765de50b1f",
+      "bytes": 1553706,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/smoke_compat_20261003/result.json",
+      "original_sha256": "e0e80e89742bdf17a798dce018c3324ac700aa6cac5b75cddd28a2d2857a21d3",
+      "bytes": 1440,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/scripts/run_git_vatex_baseline_20261003_compat.py",
+      "original_sha256": "4ed3cc8dca7fffea7f801917e1806a964a112ac2d816a50b8c471b4382d22680",
+      "bytes": 11137,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/experiments/external_baseline_protocol_20260928.md",
+      "original_sha256": "fba74d13ff57c070ed07b3404b7653cdf4fc3e3f0c9e7f25d285703049f72dfb",
+      "bytes": 4466,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model_download.json",
+      "original_sha256": "d9a98fc82dbf6cf211dc3f9840a78b6fb12500d0528839bc18d0227c38e5676a",
+      "bytes": 3149,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model/model.safetensors",
+      "original_sha256": "04ea5c7d586ada3d9fb626eec35fef084c45d6f8b817469fb520ab9cbcca44ca",
+      "bytes": 706545064,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model/README.md",
+      "original_sha256": "86f93b9630d7ea89f0296577c3a56566b777ad23c14332060d41187158e4257d",
+      "bytes": 3125,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model/config.json",
+      "original_sha256": "ea6755c2399c30c4ef232475fcc824b613eb4edb8b37a1e85a67ba1646d35001",
+      "bytes": 2819,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model/generation_config.json",
+      "original_sha256": "038491bf746d76c662790d297cd0b4555708784d9263c7517ac42c41621a1fb9",
+      "bytes": 141,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model/preprocessor_config.json",
+      "original_sha256": "4e38ab526c2e1e716a9361b33383fe7f6678c22e59915c01f6594dccb7ac8376",
+      "bytes": 440,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model/special_tokens_map.json",
+      "original_sha256": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3",
+      "bytes": 125,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model/tokenizer.json",
+      "original_sha256": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+      "bytes": 711396,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model/tokenizer_config.json",
+      "original_sha256": "5b5d830c6763f67d6f068100a26fe48fbba609e95bd8d428080accaf34eddfdf",
+      "bytes": 453,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/model/vocab.txt",
+      "original_sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
+      "bytes": 231508,
+      "redistributed": false
+    },
+    {
+      "source": "${CODE_ROOT}/runs/external_baseline_git_vatex_20260928/smoke/compatibility_audit.json",
+      "original_sha256": "538e68546f072c24b2eb2299f1a49ff60c1e8577bb18171249326fadbf848842",
+      "bytes": 676,
+      "redistributed": false
+    }
+  ],
+  "boundary_rules": {
+    "test2990": "matched 2990 video candidates / 59794 original caption queries; not standard 1K",
+    "recall": "raw fraction x100 = percent; paired delta = percentage_points",
+    "caption": "raw corpus score x100; delta = display_score_points",
+    "seed_uncertainty": "sample SD n-1 across three seeds; not significance or confidence interval",
+    "grounding_ci": "single-seed video bootstrap conditional on fixed donor assignment",
+    "GIT": "single VATEX checkpoint, six frames; different training/preprocessing; no causal or speed ranking",
+    "timing": "deployment observations remain separate from E0-E4 formal efficiency cells"
+  }
+}

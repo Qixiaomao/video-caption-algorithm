@@ -20,6 +20,12 @@ checkpoints/
 data/
 Image/
 
+# Source package, not dataset material. The broad data/ rule above otherwise
+# hides the caption dataloader from version control.
+!src/data/
+!src/data/__init__.py
+!src/data/data_loader.py
+
 # --- 运行日志与生成结果 ---
 logs/
 eval_results/
@@ -41,3 +47,48 @@ prompts/
 chainlit.md
 requirements.full-freeze.txt
 public_posts/
+
+# Publication audit additions: weights, caches, secrets and third-party media
+*.pt
+*.pkl
+*.pickle
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.faiss
+*.engine
+*.plan
+*.zip
+*.tar
+*.gz
+*.7z
+*.mp4
+*.avi
+*.webm
+*.mov
+*.mkv
+.env.*
+!.env.example
+.secrets/
+credentials*.json
+*.pem
+*.key
+.agents/
+.codex/
+.idea/
+venv/
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.log
+*.nsys-rep
+*.ncu-rep
+*.sqlite
+*.sqlite3
+*.docx
+*.pdf
+experiments/*.local.json
+models/

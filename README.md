@@ -1,162 +1,96 @@
-# Video Captioning Transformer
+# Video captioning and retrieval on a 4 GiB GPU
 
-This repository contains the implementation for a master's graduation project on video captioning with a ViT-based visual encoder and a GPT-2 text decoder. The project also includes local benchmarking and profiling entrypoints, plus a Chainlit + FastAPI demo stack for interactive inference.
+ViT-B/16 + GPT-2 Small captioning with a controlled InfoNCE intervention,
+paired-seed retrieval evaluation, and a recorded E0-E4 inference study on an
+RTX 3050. This repository also retains the original FastAPI/Chainlit demo and
+profiling utilities.
 
-## Overview
+Start with [the reproduction guide](reproducibility/README.md). The October 2026
+release brings together the formal MSVD/MSR-VTT runners, protocols, CPR negative
+result, GIT-base-VATEX reference adapter, and numeric evidence used for the paper.
 
-The system covers the full workflow for video captioning:
-- video frame preprocessing
-- multimodal caption generation
-- training and evaluation scripts
-- interactive local inference UI
-- Nsight Systems / Nsight Compute profiling workflows
+## Check reported numbers without a GPU
 
-## Repository Layout
+Python 3.11; no third-party packages or downloads needed:
 
-- `core/`: runtime, profiling, benchmarking, and shared inference logic
-- `src/`: model and training code
-- `server/`: FastAPI backend used by the demo stack
-- `frontend/`: Chainlit interface for interactive caption generation
-- `scripts/`: PowerShell and Python utility scripts for setup, preprocessing, and experiments
-- `docs/`: development notes, public writeups, and profiling records
-- `reports/`: generated benchmark and profiler outputs
-- `data/`: local datasets and processed frame directories
-- `checkpoints/`, `outputs/`, `runs/`: model artifacts and experiment outputs
+```bash
+python scripts/verify_public_evidence.py
+python scripts/audit_public_release.py
+python -m unittest discover -s tests -p test_public_evidence.py -v
+```
 
-## Models and Data
+The verifier checks 1,036 table rows against 778 extracted numeric source fields
+and independently recomputes 270 three-seed summaries. Original source hashes
+are recorded separately from the hashes of these public extracts. Checking an
+extract is not a replacement for authenticating the omitted original files or
+rerunning a model.
 
-Large assets are intentionally not committed to GitHub.
-- Model checkpoints are expected to be stored locally.
-- Datasets such as MSVD or MSR-VTT should be prepared under the local `data/` directory.
-- Some workflows default to offline model loading so local benchmarking stays reproducible.
+## Evidence and interpretation
 
-## Features
+- MSVD test670: T2V R@1 A/B means 2.5706/5.7138%; paired B-A +3.1433 percentage
+  points across seeds 123/124/125, with sample SD 1.0631 points.
+- MSR-VTT test2990: T2V R@1 A/B means 0.8340/2.5025%; paired B-A +1.6685 points.
+  This uses 2,990 video candidates and 59,794 original caption queries, not the
+  standard MSR-VTT 1K retrieval benchmark.
+- E4 versus E0 at batch 8: recorded median end-to-end latency 2,541.15 to 863.46 ms
+  and peak reserved memory 2,160 to 1,410 MiB. FP16 is the major end-to-end
+  contributor. E1 and E2 are required references; the result does not establish
+  a universal hardware advantage or an independent channels-last benefit.
+- Caption automatic metric changes are mixed. The bounded qualitative review
+  was AI-assisted. No completed human evaluation is claimed.
+- CPR did not meet the registered retention gate and remains a negative result.
+  GIT-base-VATEX is a different-training, six-frame external caption reference;
+  its resource observations do not support a speed ranking against E0-E4.
 
-- Vision Transformer based visual encoding
-- GPT-2 based caption decoding
-- frame-based video preprocessing pipeline
-- CLI and UI inference paths
-- local benchmarking for latency and throughput
-- Nsight Systems and Nsight Compute profiling entrypoints
-- FastAPI + Chainlit demo integration
+## Install the experiment environment
 
-## Environment Setup
+The recorded runtime is Python 3.11, PyTorch 2.5.1+cu121 and Torchvision
+0.20.1+cu121. Use a single environment throughout:
 
-This project uses a dedicated Python 3.11 virtual environment under `.venv`.
+```bash
+python -m venv .venv
+# Activate .venv in your shell, then:
+python -m pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+python -m pip install -r requirements-experiments.txt
+python -m unittest discover -s tests -v
+```
 
-Install dependencies:
+Full tests also require Java on PATH for the locked METEOR/PTB scorer.
+Tests requiring local frozen datasets, checkpoints or training traces explicitly
+skip when those assets are absent. They must pass when the assets are supplied.
+The dependency list reflects the inspected local environment; a clean install
+and full GPU reproduction have not been performed for this publication update.
+
+## Where things live
+
+- `src/`: caption model, dataloader, CE/InfoNCE/CPR objectives and checkpoint state.
+- `core/`: inference, optimization switches, profiling and benchmark code.
+- `scripts/`: preparation, formal experiment runners, scoring and release checks.
+- `experiments/`: dated protocols and historical result notes. These are a history,
+  not competing current specifications; follow the reproduction guide's entrypoints.
+- `tests/`: model-free contract checks and asset-dependent integration checks.
+- `reproducibility/evidence/`: public table, numeric extracts, lineage and hashes.
+- `reproducibility/archived_drivers/`: original staged recovery/test adapters with
+  repository-root relocation; these still require the original frozen run assets.
+- `server/`, `frontend/`: the original interactive demo.
+
+Raw videos, reference/generated captions, checkpoints, feature caches, original
+full logs and private research notes are not distributed in this snapshot.
+Acquire third-party assets from their sources under their respective terms.
+See the reproduction guide for the remaining asset and relocation dependencies.
+
+## Original local demo and profiling
+
+These optional workflows use the broader `requirements.txt` environment:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File scripts/check_project_env.ps1
+powershell -ExecutionPolicy Bypass -File scripts/start_app_stack.ps1
+powershell -ExecutionPolicy Bypass -File scripts/run_profiling.ps1 -Mode benchmark
+powershell -ExecutionPolicy Bypass -File scripts/run_nsys.ps1
+powershell -ExecutionPolicy Bypass -File scripts/run_ncu.ps1 -Target GPT2_Decoder_Step
 ```
 
-Check the local project environment:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\check_project_env.ps1
-```
-
-## Run the App Stack
-
-Start backend and frontend together:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start_app_stack.ps1
-```
-
-Manual fallback commands:
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8001 --reload
-.\.venv\Scripts\python.exe -m chainlit run frontend/chainlit_app.py -w --host 127.0.0.1 --port 8000
-```
-
-## CLI Inference
-
-Example:
-
-```powershell
-python src/cli/inference.py --video_path example.mp4 --checkpoint outputs/checkpoints/best.ckpt --num_frames 16
-```
-
-## Benchmarking and Profiling
-
-Run the optimization baseline benchmark:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_profiling.ps1 -Mode benchmark
-```
-
-Default outputs:
-
-```text
-reports\baseline_iterations.csv
-reports\baseline_summary.json
-```
-
-Run the single profiling entrypoint:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_profiling.ps1 -Mode profile
-```
-
-Default output:
-
-```text
-reports\profile_once.json
-```
-
-Run Nsight Systems:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_nsys.ps1
-```
-
-Important:
-- `nsys-ui.exe` is the GUI launcher and does not accept CLI profiling flags like `profile --trace ...`.
-- Use the CLI binary `nsys.exe` (typically under `target-windows-x64`).
-
-Default outputs:
-
-```text
-reports\profile_once.nsys-rep
-reports\profile_once.json
-```
-
-If needed, override the `nsys.exe` path:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_nsys.ps1 -NsightSystemsExe "D:\programs\NsightSystems\target-windows-x64\nsys.exe"
-```
-
-Run Nsight Compute for the GPT-2 decoder hotspot:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target GPT2_Decoder_Step
-```
-
-Or target the encoder:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target ViT_Encoder
-```
-
-Example outputs:
-
-```text
-reports\ncu_gpt2_decoder.ncu-rep
-reports\ncu_gpt2_decoder_meta.json
-reports\ncu_vit_encoder.ncu-rep
-reports\ncu_vit_encoder_meta.json
-```
-
-If needed, override the `ncu.bat` path:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_ncu.ps1 -Target GPT2_Decoder_Step -NsightComputeBat "D:\programs\Nsight Compute\ncu.bat"
-```
-
-## Notes
-
-- Benchmarking and profiling scripts default to offline model loading unless you explicitly enable online checks.
-- Generated reports under `reports/` are local artifacts and may differ by machine, driver, CUDA version, and installed profiler tooling.
+Nsight tools are installed separately. Generated profiler reports stay local.
+Read [AGENTS.md](AGENTS.md) before changing the experimental contracts.
