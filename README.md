@@ -93,4 +93,4 @@ powershell -ExecutionPolicy Bypass -File scripts/run_ncu.ps1 -Target GPT2_Decode
 ```
 
 Nsight tools are installed separately. Generated profiler reports stay local.
-Read [AGENTS.md](AGENTS.md) before changing the experimental contracts.
+Read the [reproduction guide](reproducibility/README.md) before changing the experimental contracts.

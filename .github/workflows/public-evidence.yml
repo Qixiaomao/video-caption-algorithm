@@ -17,3 +17,4 @@ jobs:
       - run: python -m compileall -q core src scripts tests reproducibility/archived_drivers
       - run: python -m unittest discover -s tests -p test_public_evidence.py -v
       - run: python -m unittest discover -s tests -p test_materialize_msrvtt_config.py -v
+      - run: python -m unittest discover -s tests -p test_public_release_audit.py -v

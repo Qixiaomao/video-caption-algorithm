@@ -92,3 +92,23 @@ venv/
 *.pdf
 experiments/*.local.json
 models/
+
+# Assistant instructions, editor rules and generated planning/specification files
+AGENTS.md
+AGENT.md
+agents.md
+agent.md
+CLAUDE.md
+GEMINI.md
+SPEC.md
+spec.md
+*.spec.md
+.cursor/
+.claude/
+.gemini/
+.specify/
+.speckit/
+.kiro/
+spec-kit/
+specs/
+codex_specs/

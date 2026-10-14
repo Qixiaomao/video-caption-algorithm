@@ -12,10 +12,20 @@ ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_SUFFIXES = {".pt", ".pth", ".bin", ".ckpt", ".safetensors", ".onnx", ".engine",
                       ".pkl", ".npy", ".npz", ".zip", ".mp4", ".avi", ".mov", ".mkv", ".docx"}
 FORBIDDEN_ROOTS = {"data", "runs", "checkpoints", "outputs", "logs", ".venv", ".secrets"}
+ASSISTANT_FILES = {"agents.md", "agent.md", "claude.md", "gemini.md", "spec.md"}
+ASSISTANT_DIRECTORIES = {".codex", ".agents", ".cursor", ".claude", ".gemini",
+                         ".specify", ".speckit", ".kiro", "spec-kit", "specs", "codex_specs"}
 SECRETS = re.compile(r"(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|"
                      r"AKIA[A-Z0-9]{16}|sk-(?:proj-)?[A-Za-z0-9_-]{30,}|"
                      r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)")
 PERSONAL_PATH = re.compile(r"(?:[A-Z]:[\\/](?:Users|Mylearn)[\\/]|/" + r"Users/[^/\s]+/)", re.I)
+
+
+def is_assistant_metadata(name):
+    parts = Path(name).parts
+    return (parts[-1].casefold() in ASSISTANT_FILES
+            or parts[-1].casefold().endswith(".spec.md")
+            or any(part.casefold() in ASSISTANT_DIRECTORIES for part in parts[:-1]))
 
 
 def audit():
@@ -27,6 +37,8 @@ def audit():
         if not path.is_file():
             continue
         checked += 1
+        if is_assistant_metadata(name):
+            findings.append({"path": name, "reason": "assistant instructions or generated planning metadata"})
         local_env = path.name == ".env" or path.name.startswith(".env.") and path.name != ".env.example"
         if path.suffix.lower() in FORBIDDEN_SUFFIXES or Path(name).parts[0] in FORBIDDEN_ROOTS or local_env:
             findings.append({"path": name, "reason": "local asset or secret configuration"})

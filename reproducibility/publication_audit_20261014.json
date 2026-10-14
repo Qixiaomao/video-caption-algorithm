@@ -8,8 +8,8 @@
   "public_rows_recomputed": 1036,
   "three_seed_summaries_independently_recomputed": 270,
   "local_test_run": {
-    "discovered": 110,
-    "passed": 104,
+    "discovered": 113,
+    "passed": 107,
     "skipped": 6,
     "failed": 0,
     "gpu_disabled": true,
@@ -22,16 +22,16 @@
     "original per-seed schedules",
     "CUDA map-location behavior"
   ],
-  "publication_scan": "PASS before commit; current tree credential-pattern/personal-path/large-asset scan only",
+  "publication_scan": "PASS; current tree credential-pattern/personal-path/large-asset and assistant-metadata scan only",
   "changes": [
-    "Public AGENTS.md without personal background or submission plans",
     ".gitignore coverage for .pt, media, caches, env variants and local configs",
     "Current source snapshot including previously uncommitted formal MSR-VTT, CPR and GIT code",
     "Numeric evidence extracts and complete row lineage without dataset text or weights",
     "Synthetic scheduling tests plus explicit asset-dependent integration skips",
     "MSR-VTT local config materializer with preparation and pinned-weight checks",
     "No-space METEOR and GIT temporal-key compatibility fixes from completed experiments",
-    "Evidence byte preservation and standard-library CI checks"
+    "Evidence byte preservation and standard-library CI checks",
+    "Exclude assistant instructions, editor metadata and generated planning/specification artifacts from publication"
   ],
   "remaining": [
     "No full GPU rerun or clean dependency installation in this publication update",
@@ -54,5 +54,11 @@
     "standard_library_tests_passed": 7,
     "syntax_compile": "PASS",
     "code_provenance_hashes": "270/270 match"
+  },
+  "assistant_metadata_revision": {
+    "removed_from_release_tree": true,
+    "ignore_rules_verified": true,
+    "tracked_metadata_regression_tests_passed": 3,
+    "full_suite": "113 discovered; 107 passed; 6 skipped; 0 failed"
   }
 }

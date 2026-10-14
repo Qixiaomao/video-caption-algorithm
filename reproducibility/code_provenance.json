@@ -6,12 +6,12 @@
     {
       "path": ".gitignore",
       "original_source_sha256": "d720dda85f2a86b1149482e88349e48dffe091fb6ea2643708373a19ff651001",
-      "public_canonical_lf_sha256": "211127aaaed22a0dfee565f28a079e8069efbe6451af6c8eaa6593885fb0ec69"
+      "public_canonical_lf_sha256": "cd77f40dda2543d6d32f66ed385d6168f990d7b9a7582d0bc83ffacbfb817678"
     },
     {
       "path": "README.md",
       "original_source_sha256": "5f3578dbde62c6b93d6b024e3a39c456917d0cffd2ed0260af2963cb7a9841fc",
-      "public_canonical_lf_sha256": "a60b21e622e6f961f2a3901b9584e0f4d3f19c27ccc972271cb1e7014f55c3d4"
+      "public_canonical_lf_sha256": "d1d29e560dc25cfa8e9e7b2cec8265bdbed39f34b1320db42f8c789250525ea1"
     },
     {
       "path": "Ui/app_chainlit.py",
