@@ -45,5 +45,14 @@
     "Sample SD is not a confidence interval or significance result",
     "GIT is an external caption reference, not a controlled causal or speed comparison",
     "CPR remains negative; qualitative review remains AI-assisted"
-  ]
+  ],
+  "clean_clone_verification": {
+    "checked_commit": "762c2a8e404d9fc3acbc5f94c45787c2768067a2",
+    "site_packages_disabled": true,
+    "public_evidence": "PASS",
+    "publication_scan": "PASS (288 files)",
+    "standard_library_tests_passed": 7,
+    "syntax_compile": "PASS",
+    "code_provenance_hashes": "270/270 match"
+  }
 }
