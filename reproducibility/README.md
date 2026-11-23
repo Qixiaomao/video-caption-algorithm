@@ -4,6 +4,12 @@ Publication snapshot: 2026-10-14. Numeric evidence was frozen/audited on
 2026-10-03 and its 67 source/dependency hashes were reverified locally for this
 snapshot. Original experiment inputs and runs were not modified.
 
+Documentation and software citation update: 2026-11-23. The frozen numeric
+evidence files and their manifest hashes are unchanged by this update.
+See [environment notes](ENVIRONMENTS.md) for historical runtimes versus the
+Python 3.11 dependency profile, and [citation instructions](CITATION.md) for
+software attribution and ORCID registration.
+
 ## What can be reproduced from a clone
 
 The public evidence check is self-contained and uses Python's standard library:

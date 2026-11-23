@@ -9,6 +9,18 @@ Start with [the reproduction guide](reproducibility/README.md). The October 2026
 release brings together the formal MSVD/MSR-VTT runners, protocols, CPR negative
 result, GIT-base-VATEX reference adapter, and numeric evidence used for the paper.
 
+## Choose an entry point
+
+- **Check the paper's numbers:** run the model-free checks below, then inspect
+  [`reproducibility/evidence/`](reproducibility/evidence/).
+- **Locate an experiment:** follow the dataset-specific protocols and runner
+  commands in the [reproduction guide](reproducibility/README.md).
+- **Prepare a local environment:** read the [environment notes](reproducibility/ENVIRONMENTS.md)
+  before using the dependency file. Historical runs used different environments.
+- **Cite the software or list it on ORCID:** use [the citation guide](reproducibility/CITATION.md)
+  and [`CITATION.cff`](CITATION.cff).
+- **Run the original demo:** see the optional demo and profiling commands below.
+
 ## Check reported numbers without a GPU
 
 Python 3.11; no third-party packages or downloads needed:
@@ -42,10 +54,15 @@ rerunning a model.
   GIT-base-VATEX is a different-training, six-frame external caption reference;
   its resource observations do not support a speed ranking against E0-E4.
 
-## Install the experiment environment
+## Set up the Python 3.11 dependency profile
 
-The recorded runtime is Python 3.11, PyTorch 2.5.1+cu121 and Torchvision
-0.20.1+cu121. Use a single environment throughout:
+`requirements-experiments.txt` targets Python 3.11, PyTorch 2.5.1+cu121 and
+Torchvision 0.20.1+cu121. This dependency profile is not a record of every
+experiment's runtime. MSVD training preflights record PyTorch 2.11.0+cu128;
+the efficiency study records Python 3.14.3, PyTorch 2.11.0+cu128 and CUDA 12.8.
+MSR-VTT training records PyTorch 2.5.1+cu121. See the
+[environment notes](reproducibility/ENVIRONMENTS.md) for these boundaries.
+Use a Python 3.11 interpreter for the setup below:
 
 ```bash
 python -m venv .venv
@@ -58,8 +75,9 @@ python -m unittest discover -s tests -v
 Full tests also require Java on PATH for the locked METEOR/PTB scorer.
 Tests requiring local frozen datasets, checkpoints or training traces explicitly
 skip when those assets are absent. They must pass when the assets are supplied.
-The dependency list reflects the inspected local environment; a clean install
-and full GPU reproduction have not been performed for this publication update.
+The dependency profile has not been validated by a clean installation and a
+full GPU rerun. It must not be treated as a byte-identical replay environment
+for the MSVD or efficiency results.
 
 ## Where things live
 
@@ -94,3 +112,14 @@ powershell -ExecutionPolicy Bypass -File scripts/run_ncu.ps1 -Target GPT2_Decode
 
 Nsight tools are installed separately. Generated profiler reports stay local.
 Read the [reproduction guide](reproducibility/README.md) before changing the experimental contracts.
+
+## Citation and licensing status
+
+Software citation metadata, including the maintainer's ORCID iD, is provided in
+[`CITATION.cff`](CITATION.cff). Cite the software commit or an actual released
+version that you used. Paper acceptance, a software DOI and a tagged software
+version are not asserted by this metadata.
+
+No project-wide license is currently specified. Source availability and citation
+metadata do not supply a reuse license. Third-party code, models and datasets
+retain their own terms.

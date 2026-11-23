@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it and record the commit or released version used."
+type: software
+title: "Video captioning and retrieval on a 4 GiB GPU"
+authors:
+  - family-names: "Huang"
+    given-names: "Yiming"
+    orcid: "https://orcid.org/0009-0004-3968-4435"
+repository-code: "https://github.com/Qixiaomao/video-caption-algorithm"
+url: "https://github.com/Qixiaomao/video-caption-algorithm"
+abstract: "ViT-B/16 and GPT-2 Small video captioning and retrieval, with controlled connector-alignment experiments, a recorded consumer-GPU inference study, and public numeric evidence."
+keywords:
+  - video captioning
+  - text-to-video retrieval
+  - contrastive alignment
+  - inference efficiency
+  - reproducibility

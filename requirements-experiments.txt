@@ -1,4 +1,6 @@
-# Python 3.11. Recorded GPU run: torch 2.5.1+cu121, torchvision 0.20.1+cu121.
+# Python 3.11 dependency profile; not a uniform historical run environment.
+# MSR-VTT records torch 2.5.1+cu121; MSVD/efficiency record torch 2.11.0+cu128.
+# See reproducibility/ENVIRONMENTS.md before attempting an archival replay.
 # Install those CUDA wheels first from https://download.pytorch.org/whl/cu121.
 # CUDA/CuPy demo requirements remain in requirements.txt.
 torch==2.5.1
